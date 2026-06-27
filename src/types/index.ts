@@ -30,8 +30,3 @@ export interface PlayerProfile {
   contactNumber?: string;
   skillLevel: SkillLevel;
 }
-
-export interface AppData {
-  sessions: Session[];
-  playerProfile: PlayerProfile | null;
-}

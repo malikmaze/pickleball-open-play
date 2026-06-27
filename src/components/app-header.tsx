@@ -33,6 +33,7 @@ export function AppHeader({
                 src="/images/logo.png"
                 alt="SisClub logo"
                 fill
+                sizes="40px"
                 className="object-cover"
                 priority
               />

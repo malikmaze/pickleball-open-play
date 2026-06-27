@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 const navItems = [
   { href: "/", label: "Home", icon: Home },
   { href: "/dashboard", label: "Sessions", icon: CalendarDays },
-  { href: "/admin", label: "Admin", icon: Shield },
+  { href: "/login", label: "Admin", icon: Shield },
 ];
 
 export function BottomNav() {
@@ -21,7 +21,10 @@ export function BottomNav() {
           const isActive =
             href === "/"
               ? pathname === "/"
-              : pathname.startsWith(href);
+              : href === "/login"
+                ? pathname.startsWith("/login") ||
+                  pathname.startsWith("/admin")
+                : pathname.startsWith(href);
 
           return (
             <Link

@@ -23,27 +23,32 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { useAppData } from "@/hooks/use-app-data";
+import { setJoinedPlayerId, usePlayerProfile } from "@/hooks/use-player-profile";
 import { SKILL_LEVELS } from "@/lib/constants";
-import { joinSession, savePlayerProfile } from "@/lib/storage";
+import { getPlayerProfile } from "@/lib/player-profile";
+import { createClient } from "@/utils/supabase/client";
+import {
+  fetchSessionById,
+  joinSessionRecord,
+} from "@/utils/supabase/queries";
 import type { SkillLevel } from "@/types";
 
 function JoinForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const sessionId = searchParams.get("sessionId");
-  const { data, updateData } = useAppData();
+  const { saveProfile } = usePlayerProfile();
 
-  const [name, setName] = useState(data?.playerProfile?.name ?? "");
+  const [name, setName] = useState(() => getPlayerProfile()?.name ?? "");
   const [contactNumber, setContactNumber] = useState(
-    data?.playerProfile?.contactNumber ?? ""
+    () => getPlayerProfile()?.contactNumber ?? ""
   );
   const [skillLevel, setSkillLevel] = useState<SkillLevel>(
-    data?.playerProfile?.skillLevel ?? "Mixed"
+    () => getPlayerProfile()?.skillLevel ?? "Mixed"
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!name.trim()) {
@@ -51,44 +56,50 @@ function JoinForm() {
       return;
     }
 
-    if (sessionId && data) {
-      const session = data.sessions.find((s) => s.id === sessionId);
-      if (!session) {
-        toast.error("Session not found");
-        return;
-      }
-      if (session.status === "full") {
-        toast.error("This session is full");
-        return;
-      }
-      if (session.status === "closed") {
-        toast.error("This session is closed");
+    if (sessionId) {
+      try {
+        const supabase = createClient();
+        const session = await fetchSessionById(supabase, sessionId);
+        if (!session) {
+          toast.error("Session not found");
+          return;
+        }
+        if (session.status === "full") {
+          toast.error("This session is full");
+          return;
+        }
+        if (session.status === "closed") {
+          toast.error("This session is closed");
+          return;
+        }
+      } catch {
+        toast.error("Failed to verify session");
         return;
       }
     }
 
     setIsSubmitting(true);
 
-    updateData((prev) => {
-      let next = savePlayerProfile(prev, {
-        id: prev.playerProfile?.id,
-        name,
-        contactNumber,
-        skillLevel,
-      });
+    try {
+      const saved = saveProfile({ name, contactNumber, skillLevel });
 
-      if (sessionId && next.playerProfile) {
-        next = joinSession(next, sessionId, next.playerProfile);
+      if (sessionId) {
+        const supabase = createClient();
+        const playerId = await joinSessionRecord(supabase, sessionId, saved);
+        setJoinedPlayerId(sessionId, playerId);
+        toast.success("You're in! See you on court.");
+      } else {
+        toast.success("Profile saved successfully");
       }
 
-      return next;
-    });
-
-    toast.success(
-      sessionId ? "You're in! See you on court." : "Profile saved successfully"
-    );
-    setIsSubmitting(false);
-    router.push("/dashboard");
+      router.push("/dashboard");
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Something went wrong"
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (

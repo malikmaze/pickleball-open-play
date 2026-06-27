@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 const navItems = [
   { href: "/", label: "Home", icon: Home },
   { href: "/dashboard", label: "Sessions", icon: CalendarDays },
-  { href: "/admin", label: "Admin", icon: Shield },
+  { href: "/login", label: "Admin", icon: Shield },
 ];
 
 export function DesktopNav() {
@@ -19,7 +19,7 @@ export function DesktopNav() {
       <div className="mx-auto flex max-w-3xl items-center justify-center gap-1 px-4 py-2">
         {navItems.map(({ href, label, icon: Icon }) => {
           const isActive =
-            href === "/" ? pathname === "/" : pathname.startsWith(href);
+            href === "/" ? pathname === "/" : href === "/login" ? pathname.startsWith("/login") || pathname.startsWith("/admin") : pathname.startsWith(href);
 
           return (
             <Link

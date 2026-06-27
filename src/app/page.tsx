@@ -13,6 +13,7 @@ export default function LandingPage() {
               src="/images/hero-poster.png"
               alt="Pickleball Open Play"
               fill
+              sizes="(max-width: 640px) 192px, 224px"
               className="object-cover"
               priority
             />
@@ -25,6 +26,7 @@ export default function LandingPage() {
               src="/images/logo.png"
               alt="SisClub"
               fill
+              sizes="32px"
               className="object-cover"
             />
           </div>
@@ -49,10 +51,10 @@ export default function LandingPage() {
             Join Open Play
           </Link>
           <Link
-            href="/admin"
+            href="/login"
             className="inline-flex h-12 items-center justify-center rounded-full border-2 border-black/10 bg-background font-semibold transition-all hover:bg-sisclub-pink-soft"
           >
-            Organizer Admin
+            Organizer Login
           </Link>
         </div>
 

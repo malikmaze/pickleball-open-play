@@ -1,24 +1,29 @@
-/**
- * Auth placeholder for future implementation.
- * Replace these stubs with real authentication (e.g. NextAuth, Clerk).
- */
+import { cookies } from "next/headers";
+import { createClient } from "@/utils/supabase/server";
 
-export interface AuthUser {
-  id: string;
-  email: string;
-  role: "player" | "organizer" | "admin";
+export async function getAuthUser() {
+  const cookieStore = await cookies();
+  const supabase = createClient(cookieStore);
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  return user;
 }
 
-export function getCurrentUser(): AuthUser | null {
-  // MVP: no authentication
-  return null;
-}
+export async function isAdminUser(): Promise<boolean> {
+  const cookieStore = await cookies();
+  const supabase = createClient(cookieStore);
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-export function isOrganizer(): boolean {
-  // MVP: admin route is open; gate here when auth is added
-  return true;
-}
+  if (!user?.email) return false;
 
-export function requireOrganizer(): boolean {
-  return isOrganizer();
+  const { data: admin } = await supabase
+    .from("admins")
+    .select("id")
+    .ilike("email", user.email)
+    .maybeSingle();
+
+  return !!admin;
 }
