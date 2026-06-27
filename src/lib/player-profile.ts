@@ -1,4 +1,4 @@
-import type { PlayerProfile, SkillLevel } from "@/types";
+import type { PlayerProfile, PlayerSkillLevel } from "@/types";
 
 const PROFILE_KEY = "sisclub-player-profile";
 const JOINED_KEY = "sisclub-joined-players";
@@ -32,7 +32,7 @@ export function getPlayerProfile(): PlayerProfile | null {
 export function savePlayerProfile(profile: {
   name: string;
   contactNumber?: string;
-  skillLevel: SkillLevel;
+  skillLevel: PlayerSkillLevel;
 }): PlayerProfile {
   const saved: PlayerProfile = {
     id: getPlayerProfile()?.id ?? crypto.randomUUID(),

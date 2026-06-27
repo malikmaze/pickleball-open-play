@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -41,7 +42,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useSessions } from "@/hooks/use-sessions";
-import { SKILL_LEVELS } from "@/lib/constants";
+import { SESSION_SKILL_LEVELS } from "@/lib/constants";
+import { defaultSessionFields } from "@/lib/sessions";
 import { createClient } from "@/utils/supabase/client";
 import {
   clearSessionPlayersRecord,
@@ -50,7 +52,7 @@ import {
   toggleSessionClosedRecord,
   updateSessionRecord,
 } from "@/utils/supabase/queries";
-import type { Session, SkillLevel } from "@/types";
+import type { Session, SessionSkillLevel } from "@/types";
 
 interface SessionFormData {
   title: string;
@@ -59,7 +61,7 @@ interface SessionFormData {
   endTime: string;
   location: string;
   courtNumber: string;
-  skillLevel: SkillLevel;
+  skillLevel: SessionSkillLevel;
   maxPlayers: number;
 }
 
@@ -133,6 +135,7 @@ export default function AdminPage() {
         toast.success("Session updated");
       } else {
         await createSessionRecord(supabase, {
+          ...defaultSessionFields(),
           title: form.title.trim(),
           date: form.date,
           startTime: form.startTime,
@@ -311,6 +314,12 @@ export default function AdminPage() {
                   </p>
 
                   <div className="flex flex-wrap gap-2">
+                    <Link
+                      href={`/admin/sessions/${session.id}`}
+                      className="inline-flex h-7 items-center rounded-full bg-sisclub-green px-3 text-xs font-medium text-white hover:bg-sisclub-green-dark"
+                    >
+                      Manage
+                    </Link>
                     <Button
                       size="sm"
                       variant="outline"
@@ -472,14 +481,14 @@ export default function AdminPage() {
               <Select
                 value={form.skillLevel}
                 onValueChange={(v) =>
-                  setForm({ ...form, skillLevel: v as SkillLevel })
+                  setForm({ ...form, skillLevel: v as SessionSkillLevel })
                 }
               >
                 <SelectTrigger className="w-full rounded-2xl border-2 border-black/10">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {SKILL_LEVELS.map((level) => (
+                  {SESSION_SKILL_LEVELS.map((level) => (
                     <SelectItem key={level} value={level}>
                       {level}
                     </SelectItem>

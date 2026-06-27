@@ -1,4 +1,4 @@
-import type { SessionStatus, SkillLevel } from "@/types";
+import type { PlayerSkillLevel, SessionSkillLevel, SessionStatus } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
@@ -20,11 +20,19 @@ const statusConfig: Record<
   },
 };
 
-const skillConfig: Record<SkillLevel, string> = {
+const sessionSkillConfig: Record<SessionSkillLevel, string> = {
   Beginner: "bg-blue-50 text-blue-700 border-blue-200",
   Intermediate: "bg-amber-50 text-amber-700 border-amber-200",
   Advanced: "bg-purple-50 text-purple-700 border-purple-200",
   Mixed: "bg-sisclub-pink-soft text-sisclub-green-dark border-sisclub-pink/30",
+};
+
+const playerSkillConfig: Record<PlayerSkillLevel, string> = {
+  Beginner: "bg-blue-50 text-blue-700 border-blue-200",
+  Novice: "bg-cyan-50 text-cyan-700 border-cyan-200",
+  "Intermediate Low": "bg-amber-50 text-amber-700 border-amber-200",
+  "Intermediate High": "bg-orange-50 text-orange-700 border-orange-200",
+  Advanced: "bg-purple-50 text-purple-700 border-purple-200",
 };
 
 export function StatusBadge({ status }: { status: SessionStatus }) {
@@ -39,11 +47,22 @@ export function StatusBadge({ status }: { status: SessionStatus }) {
   );
 }
 
-export function SkillBadge({ level }: { level: SkillLevel }) {
+export function SkillBadge({ level }: { level: SessionSkillLevel }) {
   return (
     <Badge
       variant="outline"
-      className={cn("rounded-full border font-medium", skillConfig[level])}
+      className={cn("rounded-full border font-medium", sessionSkillConfig[level])}
+    >
+      {level}
+    </Badge>
+  );
+}
+
+export function PlayerSkillBadge({ level }: { level: PlayerSkillLevel }) {
+  return (
+    <Badge
+      variant="outline"
+      className={cn("rounded-full border font-medium", playerSkillConfig[level])}
     >
       {level}
     </Badge>

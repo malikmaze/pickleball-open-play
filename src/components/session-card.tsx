@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Clock, MapPin, Users } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
@@ -117,14 +118,14 @@ export function SessionCard({
         )}
       </CardContent>
 
-      <CardFooter className="gap-2 pt-2">
+      <CardFooter className="flex-col gap-2 pt-2 sm:flex-row">
         {canJoin && (
           <Button
             onClick={handleJoin}
             disabled={isLoading}
             className="flex-1 rounded-full border-2 border-black/10 bg-sisclub-green font-semibold text-white shadow-sm transition-all hover:bg-sisclub-green-dark hover:shadow-md"
           >
-            Join
+            Register
           </Button>
         )}
         {canLeave && (
@@ -154,10 +155,13 @@ export function SessionCard({
             Closed
           </Button>
         )}
-        {isJoined && session.status === "open" && (
-          <span className="flex items-center text-xs font-medium text-sisclub-green">
-            ✓ You&apos;re in!
-          </span>
+        {isJoined && (
+          <Link
+            href={`/session/${session.id}`}
+            className="text-center text-xs font-medium text-sisclub-green underline-offset-2 hover:underline"
+          >
+            View my status →
+          </Link>
         )}
       </CardFooter>
     </Card>
