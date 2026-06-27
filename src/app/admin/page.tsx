@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
   Loader2,
@@ -10,6 +11,7 @@ import {
   Users,
   Lock,
   Unlock,
+  LogOut,
 } from "lucide-react";
 import { AppHeader } from "@/components/app-header";
 import { ConfirmDialog } from "@/components/confirm-dialog";
@@ -38,17 +40,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useAppData } from "@/hooks/use-app-data";
-import { useMounted } from "@/hooks/use-mounted";
+import { useSessions } from "@/hooks/use-sessions";
 import { SKILL_LEVELS } from "@/lib/constants";
+import { createClient } from "@/utils/supabase/client";
 import {
-  clearSessionPlayers,
-  createSession,
-  deleteSession,
-  getTodaySessions,
-  toggleSessionClosed,
-  updateSession,
-} from "@/lib/storage";
+  clearSessionPlayersRecord,
+  createSessionRecord,
+  deleteSessionRecord,
+  toggleSessionClosedRecord,
+  updateSessionRecord,
+} from "@/utils/supabase/queries";
 import type { Session, SkillLevel } from "@/types";
 
 interface SessionFormData {
@@ -74,8 +75,8 @@ const emptyForm = (): SessionFormData => ({
 });
 
 export default function AdminPage() {
-  const mounted = useMounted();
-  const { data, isLoading, updateData } = useAppData();
+  const router = useRouter();
+  const { sessions, isLoading, error, refetch } = useSessions();
   const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<SessionFormData>(emptyForm());
@@ -84,8 +85,6 @@ export default function AdminPage() {
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [clearTarget, setClearTarget] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
-
-  const sessions = data ? getTodaySessions(data.sessions) : [];
 
   const openCreate = () => {
     setEditingId(null);
@@ -108,7 +107,7 @@ export default function AdminPage() {
     setFormOpen(true);
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!form.title.trim()) {
@@ -117,10 +116,11 @@ export default function AdminPage() {
     }
 
     setIsSaving(true);
+    const supabase = createClient();
 
-    if (editingId) {
-      updateData((prev) =>
-        updateSession(prev, editingId, {
+    try {
+      if (editingId) {
+        await updateSessionRecord(supabase, editingId, {
           title: form.title.trim(),
           date: form.date,
           startTime: form.startTime,
@@ -129,12 +129,10 @@ export default function AdminPage() {
           courtNumber: form.courtNumber.trim(),
           skillLevel: form.skillLevel,
           maxPlayers: form.maxPlayers,
-        })
-      );
-      toast.success("Session updated");
-    } else {
-      updateData((prev) =>
-        createSession(prev, {
+        });
+        toast.success("Session updated");
+      } else {
+        await createSessionRecord(supabase, {
           title: form.title.trim(),
           date: form.date,
           startTime: form.startTime,
@@ -143,38 +141,83 @@ export default function AdminPage() {
           courtNumber: form.courtNumber.trim(),
           skillLevel: form.skillLevel,
           maxPlayers: form.maxPlayers,
-        })
+        });
+        toast.success("Session created");
+      }
+
+      await refetch();
+      setFormOpen(false);
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to save session"
       );
-      toast.success("Session created");
+    } finally {
+      setIsSaving(false);
     }
-
-    setIsSaving(false);
-    setFormOpen(false);
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!deleteTarget) return;
     setActionLoading(true);
-    updateData((prev) => deleteSession(prev, deleteTarget));
-    toast.success("Session deleted");
-    setDeleteTarget(null);
-    setActionLoading(false);
+
+    try {
+      const supabase = createClient();
+      await deleteSessionRecord(supabase, deleteTarget);
+      await refetch();
+      toast.success("Session deleted");
+      setDeleteTarget(null);
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to delete session"
+      );
+    } finally {
+      setActionLoading(false);
+    }
   };
 
-  const handleClearPlayers = () => {
+  const handleClearPlayers = async () => {
     if (!clearTarget) return;
     setActionLoading(true);
-    updateData((prev) => clearSessionPlayers(prev, clearTarget));
-    toast.success("Players cleared");
-    setClearTarget(null);
-    setActionLoading(false);
+
+    try {
+      const supabase = createClient();
+      await clearSessionPlayersRecord(supabase, clearTarget);
+      await refetch();
+      toast.success("Players cleared");
+      setClearTarget(null);
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to clear players"
+      );
+    } finally {
+      setActionLoading(false);
+    }
   };
 
-  const handleToggleClosed = (sessionId: string) => {
-    const wasClosed =
-      data?.sessions.find((s) => s.id === sessionId)?.status === "closed";
-    updateData((prev) => toggleSessionClosed(prev, sessionId));
-    toast.success(wasClosed ? "Session reopened" : "Session closed");
+  const handleToggleClosed = async (session: Session) => {
+    try {
+      const supabase = createClient();
+      const nextStatus = await toggleSessionClosedRecord(
+        supabase,
+        session.id,
+        session.status
+      );
+      await refetch();
+      toast.success(
+        nextStatus === "closed" ? "Session closed" : "Session reopened"
+      );
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to update session"
+      );
+    }
+  };
+
+  const handleLogout = async () => {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.push("/login");
+    router.refresh();
   };
 
   return (
@@ -191,18 +234,38 @@ export default function AdminPage() {
               Create and manage today&apos;s open play
             </p>
           </div>
-          <Button
-            onClick={openCreate}
-            className="rounded-full border-2 border-black/10 bg-sisclub-green font-semibold text-white shadow-sm hover:bg-sisclub-green-dark"
-          >
-            <Plus className="mr-1 h-4 w-4" />
-            New
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              onClick={openCreate}
+              className="rounded-full border-2 border-black/10 bg-sisclub-green font-semibold text-white shadow-sm hover:bg-sisclub-green-dark"
+            >
+              <Plus className="mr-1 h-4 w-4" />
+              New
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handleLogout}
+              className="rounded-full border-2 border-black/10"
+              aria-label="Sign out"
+            >
+              <LogOut className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
 
-        {!mounted || isLoading ? (
+        {isLoading ? (
           <div className="flex items-center justify-center py-20">
             <Loader2 className="h-8 w-8 animate-spin text-sisclub-green" />
+          </div>
+        ) : error ? (
+          <div className="rounded-3xl border-2 border-destructive/30 bg-destructive/5 px-6 py-12 text-center">
+            <p className="text-sm text-destructive">{error}</p>
+            <button
+              onClick={() => refetch()}
+              className="mt-4 text-sm font-semibold text-sisclub-green underline-offset-2 hover:underline"
+            >
+              Try again
+            </button>
           </div>
         ) : sessions.length === 0 ? (
           <Card className="rounded-3xl border-2 border-dashed border-black/10 bg-white/60">
@@ -260,7 +323,7 @@ export default function AdminPage() {
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => handleToggleClosed(session.id)}
+                      onClick={() => handleToggleClosed(session)}
                       className="rounded-full border-2 border-black/10"
                     >
                       {session.status === "closed" ? (
