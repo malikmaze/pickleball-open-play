@@ -1,5 +1,5 @@
 import { SKILL_NUMERIC } from "@/lib/constants";
-import type { PlayerSkillLevel, PlayerStatus } from "@/types";
+import type { PlayerSkillLevel, PlayerStatus, SkillMatchingMode } from "@/types";
 
 export interface QueuePlayer {
   id: string;
@@ -15,6 +15,7 @@ export interface QueuePlayer {
 export interface QueueSessionSettings {
   paymentRequired: boolean;
   allowUnpaidInQueue: boolean;
+  skillMatchingMode?: SkillMatchingMode;
 }
 
 export interface BalancedTeams {
@@ -97,7 +98,10 @@ function groupSkillSpread(players: QueuePlayer[]): number {
   return Math.max(...values) - Math.min(...values);
 }
 
-function pickCompatibleFour(pool: QueuePlayer[]): QueuePlayer[] | null {
+function pickCompatibleFour(
+  pool: QueuePlayer[],
+  mode: SkillMatchingMode = "Balanced"
+): QueuePlayer[] | null {
   if (pool.length < 4) return null;
 
   const sorted = [...pool].sort(compareQueuePriority);
@@ -105,12 +109,16 @@ function pickCompatibleFour(pool: QueuePlayer[]): QueuePlayer[] | null {
   const selected: QueuePlayer[] = [anchor];
   const remaining = sorted.slice(1);
 
+  if (mode === "Flexible") {
+    return sorted.slice(0, 4);
+  }
+
   for (const candidate of remaining) {
     if (selected.length >= 4) break;
     const compatibleWithAll = selected.every((p) =>
       isSkillCompatible(p.skillLevel, candidate.skillLevel)
     );
-    if (compatibleWithAll || selected.length >= 3) {
+    if (compatibleWithAll || mode === "Balanced" || selected.length >= 3) {
       selected.push(candidate);
     }
   }
@@ -120,6 +128,11 @@ function pickCompatibleFour(pool: QueuePlayer[]): QueuePlayer[] | null {
       if (selected.length >= 4) break;
       if (!selected.includes(candidate)) selected.push(candidate);
     }
+  }
+
+  if (mode === "Strict" && selected.length === 4) {
+    const spread = groupSkillSpread(selected);
+    if (spread > 2) return null;
   }
 
   return selected.length === 4 ? selected : null;
@@ -132,19 +145,13 @@ export function selectNextFourPlayers(
   const eligible = getEligiblePlayers(players, settings);
   if (eligible.length < 4) return null;
 
-  const ideal = pickCompatibleFour(eligible);
+  const mode = settings.skillMatchingMode ?? "Balanced";
+  const ideal = pickCompatibleFour(eligible, mode);
   if (ideal) return ideal;
 
-  const fallback = eligible.slice(0, 4);
-  if (groupSkillSpread(fallback) > 3) {
-    const mixed = [...eligible].sort((a, b) => {
-      const spreadA = groupSkillSpread([eligible[0], a, b, eligible[3]]);
-      return spreadA;
-    });
-    return mixed.slice(0, 4);
-  }
+  if (mode === "Strict") return null;
 
-  return fallback;
+  return eligible.slice(0, 4);
 }
 
 export function balanceTeams(players: QueuePlayer[]): BalancedTeams {
@@ -224,6 +231,13 @@ export function validateMatchScore(
     valid: false,
     error: `Must win by ${winBy} once target score is reached`,
   };
+}
+
+export function previewNextMatch(
+  players: QueuePlayer[],
+  settings: QueueSessionSettings
+): NextMatchAssignment | null {
+  return createNextMatchForCourt(players, settings);
 }
 
 export function toQueuePlayer(player: {

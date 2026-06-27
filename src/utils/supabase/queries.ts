@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   defaultSessionFields,
   getTodayDate,
+  mapActivity,
   mapCourt,
   mapMatch,
   mapSession,
@@ -16,6 +17,7 @@ import type {
   PlayerSkillLevel,
   PlayerStatus,
   Session,
+  SessionActivity,
   SessionBundle,
   SessionSkillLevel,
   WinnerTeam,
@@ -109,10 +111,19 @@ export async function fetchSessionBundle(
     .order("created_at", { ascending: false });
   if (matchesError) throw matchesError;
 
+  const { data: activity, error: activityError } = await supabase
+    .from("session_activity")
+    .select("*")
+    .eq("session_id", sessionId)
+    .order("created_at", { ascending: false })
+    .limit(50);
+  if (activityError) throw activityError;
+
   return {
     session,
     courts: (courts ?? []).map(mapCourt),
     matches: (matches ?? []).map(mapMatch),
+    activity: (activity ?? []).map(mapActivity),
   };
 }
 
@@ -496,6 +507,120 @@ export async function getActiveMatchForCourt(
     .maybeSingle();
   if (error) throw error;
   return data ? mapMatch(data) : null;
+}
+
+export async function updateMatchScoresRecord(
+  supabase: Client,
+  matchId: string,
+  teamAScore: number,
+  teamBScore: number
+): Promise<void> {
+  const { error } = await supabase
+    .from("matches")
+    .update({
+      team_a_score: teamAScore,
+      team_b_score: teamBScore,
+    })
+    .eq("id", matchId);
+  if (error) throw error;
+}
+
+export async function logSessionActivity(
+  supabase: Client,
+  sessionId: string,
+  message: string,
+  courtId?: string
+): Promise<SessionActivity> {
+  const { data, error } = await supabase
+    .from("session_activity")
+    .insert({
+      session_id: sessionId,
+      court_id: courtId ?? null,
+      message,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return mapActivity(data);
+}
+
+export async function changeCourtSidesRecord(
+  supabase: Client,
+  court: Court,
+  sessionId: string
+): Promise<Court> {
+  const now = new Date().toISOString();
+  const { data, error } = await supabase
+    .from("courts")
+    .update({
+      sides_swapped: !court.sidesSwapped,
+      side_change_count: court.sideChangeCount + 1,
+      last_side_change_at: now,
+    })
+    .eq("id", court.id)
+    .select()
+    .single();
+  if (error) throw error;
+  await logSessionActivity(
+    supabase,
+    sessionId,
+    `Court ${court.courtNumber} changed sides`,
+    court.id
+  );
+  return mapCourt(data);
+}
+
+export async function clearCourtRecord(
+  supabase: Client,
+  courtId: string,
+  sessionId: string,
+  courtNumber: number,
+  matchId?: string,
+  playerIds?: string[]
+): Promise<void> {
+  if (matchId) {
+    await supabase.from("matches").delete().eq("id", matchId);
+  }
+  if (playerIds?.length) {
+    for (const playerId of playerIds) {
+      await updatePlayerRecord(supabase, playerId, { status: "Waiting" });
+    }
+  }
+  await updateCourtStatus(supabase, courtId, "Empty");
+  await supabase
+    .from("courts")
+    .update({
+      sides_swapped: false,
+      side_change_count: 0,
+      last_side_change_at: null,
+    })
+    .eq("id", courtId);
+  await logSessionActivity(
+    supabase,
+    sessionId,
+    `Court ${courtNumber} cleared`,
+    courtId
+  );
+}
+
+export async function addTestPlayersToSession(
+  supabase: Client,
+  sessionId: string
+): Promise<number> {
+  const { data, error } = await supabase.rpc("add_test_players_to_session", {
+    p_session_id: sessionId,
+  });
+  if (error) throw error;
+  return data ?? 0;
+}
+
+export async function fetchTestPlayerTemplates(supabase: Client) {
+  const { data, error } = await supabase
+    .from("test_player_templates")
+    .select("*")
+    .order("sort_order", { ascending: true });
+  if (error) throw error;
+  return data ?? [];
 }
 
 export type { SessionSkillLevel };

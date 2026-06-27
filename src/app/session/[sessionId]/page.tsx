@@ -71,6 +71,7 @@ function SessionStatusContent({ sessionId }: { sessionId: string }) {
     ? getQueuePosition(queuePlayers, myPlayer.id, {
         paymentRequired: session.paymentRequired,
         allowUnpaidInQueue: session.allowUnpaidInQueue,
+        skillMatchingMode: session.skillMatchingMode,
       })
     : null;
 
@@ -147,6 +148,13 @@ function SessionStatusContent({ sessionId }: { sessionId: string }) {
       <Button variant="outline" onClick={() => load()} className="w-full rounded-full">
         Refresh status
       </Button>
+
+      <Link
+        href={`/sessions/${sessionId}/courts`}
+        className="inline-flex h-12 w-full items-center justify-center rounded-full bg-sisclub-pink font-bold text-white hover:bg-sisclub-pink-dark"
+      >
+        View Courts
+      </Link>
     </div>
   );
 }

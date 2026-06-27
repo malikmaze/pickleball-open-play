@@ -6,6 +6,8 @@ import type {
   PlayerRow,
   SessionRow,
 } from "@/utils/supabase/database.types";
+
+type ActivityRow = Database["public"]["Tables"]["session_activity"]["Row"];
 import type {
   Court,
   CourtStatus,
@@ -15,8 +17,10 @@ import type {
   PlayerSkillLevel,
   PlayerStatus,
   Session,
+  SessionActivity,
   SessionSkillLevel,
   SessionStatus,
+  SkillMatchingMode,
   WinnerTeam,
 } from "@/types";
 
@@ -58,6 +62,9 @@ export function mapCourt(row: CourtRow): Court {
     sessionId: row.session_id,
     courtNumber: row.court_number,
     status: row.status as CourtStatus,
+    sidesSwapped: row.sides_swapped ?? false,
+    sideChangeCount: row.side_change_count ?? 0,
+    lastSideChangeAt: row.last_side_change_at ?? undefined,
     createdAt: row.created_at,
   };
 }
@@ -77,6 +84,16 @@ export function mapMatch(row: MatchRow): Match {
     status: row.status as MatchStatus,
     startedAt: row.started_at ?? undefined,
     finishedAt: row.finished_at ?? undefined,
+    createdAt: row.created_at,
+  };
+}
+
+export function mapActivity(row: ActivityRow): SessionActivity {
+  return {
+    id: row.id,
+    sessionId: row.session_id,
+    courtId: row.court_id ?? undefined,
+    message: row.message,
     createdAt: row.created_at,
   };
 }
@@ -110,6 +127,9 @@ export function mapSession(
     paymentInstructions: row.payment_instructions ?? undefined,
     allowUnpaidInQueue: row.allow_unpaid_in_queue ?? true,
     autoAssignNextMatch: row.auto_assign_next_match ?? false,
+    allowSideChange: row.allow_side_change ?? true,
+    sideChangePoint: row.side_change_point ?? 8,
+    skillMatchingMode: (row.skill_matching_mode as SkillMatchingMode) ?? "Balanced",
     players: mappedPlayers,
   };
 }
@@ -146,6 +166,9 @@ export function toSessionInsert(
     payment_instructions: data.paymentInstructions ?? null,
     allow_unpaid_in_queue: data.allowUnpaidInQueue,
     auto_assign_next_match: data.autoAssignNextMatch,
+    allow_side_change: data.allowSideChange,
+    side_change_point: data.sideChangePoint,
+    skill_matching_mode: data.skillMatchingMode,
   };
 }
 
@@ -176,6 +199,12 @@ export function toSessionUpdate(
     update.allow_unpaid_in_queue = data.allowUnpaidInQueue;
   if (data.autoAssignNextMatch !== undefined)
     update.auto_assign_next_match = data.autoAssignNextMatch;
+  if (data.allowSideChange !== undefined)
+    update.allow_side_change = data.allowSideChange;
+  if (data.sideChangePoint !== undefined)
+    update.side_change_point = data.sideChangePoint;
+  if (data.skillMatchingMode !== undefined)
+    update.skill_matching_mode = data.skillMatchingMode;
   return update;
 }
 
@@ -187,6 +216,9 @@ export function defaultSessionFields(): Pick<
   | "paymentRequired"
   | "allowUnpaidInQueue"
   | "autoAssignNextMatch"
+  | "allowSideChange"
+  | "sideChangePoint"
+  | "skillMatchingMode"
 > {
   return {
     courtCount: 1,
@@ -195,5 +227,8 @@ export function defaultSessionFields(): Pick<
     paymentRequired: false,
     allowUnpaidInQueue: true,
     autoAssignNextMatch: false,
+    allowSideChange: true,
+    sideChangePoint: 8,
+    skillMatchingMode: "Balanced",
   };
 }

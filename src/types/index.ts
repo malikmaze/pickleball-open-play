@@ -29,6 +29,8 @@ export type CourtStatus = "Empty" | "Ready" | "Playing" | "Finished";
 
 export type MatchStatus = "ready" | "playing" | "finished";
 
+export type SkillMatchingMode = "Strict" | "Balanced" | "Flexible";
+
 export type WinnerTeam = "A" | "B";
 
 export interface Player {
@@ -67,6 +69,9 @@ export interface Session {
   paymentInstructions?: string;
   allowUnpaidInQueue: boolean;
   autoAssignNextMatch: boolean;
+  allowSideChange: boolean;
+  sideChangePoint: number;
+  skillMatchingMode: SkillMatchingMode;
   players: Player[];
 }
 
@@ -75,6 +80,9 @@ export interface Court {
   sessionId: string;
   courtNumber: number;
   status: CourtStatus;
+  sidesSwapped: boolean;
+  sideChangeCount: number;
+  lastSideChangeAt?: string;
   createdAt: string;
 }
 
@@ -102,8 +110,17 @@ export interface PlayerProfile {
   skillLevel: PlayerSkillLevel;
 }
 
+export interface SessionActivity {
+  id: string;
+  sessionId: string;
+  courtId?: string;
+  message: string;
+  createdAt: string;
+}
+
 export interface SessionBundle {
   session: Session;
   courts: Court[];
   matches: Match[];
+  activity: SessionActivity[];
 }

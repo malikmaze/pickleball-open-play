@@ -28,6 +28,8 @@ export const PLAYER_STATUSES: PlayerStatus[] = [
   "No Show",
 ];
 
+export const SKILL_MATCHING_MODES = ["Strict", "Balanced", "Flexible"] as const;
+
 export const APP_NAME = "Pickleball Open Play";
 export const APP_TAGLINE = "Join games. Track slots. Play more.";
 

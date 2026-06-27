@@ -8,6 +8,12 @@ import { Loader2, RefreshCw } from "lucide-react";
 import { AppHeader } from "@/components/app-header";
 import { PlayerStatusBadge } from "@/components/player-status-badge";
 import { SessionAdminTabs } from "@/components/admin/session-tabs";
+import {
+  SessionForm,
+  sessionFormToPayload,
+  sessionToFormValues,
+  type SessionFormValues,
+} from "@/components/admin/session-form";
 import { PageShell } from "@/components/page-shell";
 import { SkillBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
@@ -18,8 +24,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -27,13 +31,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { PLAYER_SKILL_LEVELS, SESSION_SKILL_LEVELS } from "@/lib/constants";
+import { PLAYER_SKILL_LEVELS } from "@/lib/constants";
 import {
   getEligiblePlayers,
   toQueuePlayer,
 } from "@/lib/queue/queue-engine";
 import { createClient } from "@/utils/supabase/client";
 import {
+  addTestPlayersToSession,
   deletePlayerRecord,
   fetchSessionBundle,
   markPlayerNoShow,
@@ -51,6 +56,8 @@ function SessionAdminContent({ sessionId }: { sessionId: string }) {
   const [bundle, setBundle] = useState<SessionBundle | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [settingsForm, setSettingsForm] = useState<SessionFormValues | null>(null);
+  const [addingTestPlayers, setAddingTestPlayers] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -58,6 +65,7 @@ function SessionAdminContent({ sessionId }: { sessionId: string }) {
       const supabase = createClient();
       const data = await fetchSessionBundle(supabase, sessionId);
       setBundle(data);
+      if (data) setSettingsForm(sessionToFormValues(data.session));
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to load session");
     } finally {
@@ -73,7 +81,10 @@ function SessionAdminContent({ sessionId }: { sessionId: string }) {
       try {
         const supabase = createClient();
         const data = await fetchSessionBundle(supabase, sessionId);
-        if (!cancelled) setBundle(data);
+        if (!cancelled) {
+          setBundle(data);
+          if (data) setSettingsForm(sessionToFormValues(data.session));
+        }
       } catch (err) {
         if (!cancelled) {
           toast.error(err instanceof Error ? err.message : "Failed to load session");
@@ -131,34 +142,39 @@ function SessionAdminContent({ sessionId }: { sessionId: string }) {
     }
   };
 
-  const handleSaveSettings = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!session) return;
+    if (!session || !settingsForm) return;
     setSaving(true);
-    const form = new FormData(e.currentTarget);
     const supabase = createClient();
     try {
-      await updateSessionRecord(supabase, sessionId, {
-        courtCount: Number(form.get("courtCount")),
-        targetScore: Number(form.get("targetScore")),
-        winBy: Number(form.get("winBy")),
-        paymentRequired: form.get("paymentRequired") === "on",
-        paymentAmount: form.get("paymentAmount")
-          ? Number(form.get("paymentAmount"))
-          : undefined,
-        paymentNote: String(form.get("paymentNote") || ""),
-        paymentInstructions: String(form.get("paymentInstructions") || ""),
-        allowUnpaidInQueue: form.get("allowUnpaidInQueue") === "on",
-        autoAssignNextMatch: form.get("autoAssignNextMatch") === "on",
-        maxPlayers: Number(form.get("maxPlayers")),
-        skillLevel: String(form.get("skillLevel")) as Session["skillLevel"],
-      });
+      await updateSessionRecord(supabase, sessionId, sessionFormToPayload(settingsForm));
       toast.success("Settings saved");
       await load();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Save failed");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleAddTestPlayers = async () => {
+    setAddingTestPlayers(true);
+    const supabase = createClient();
+    try {
+      const count = await addTestPlayersToSession(supabase, sessionId);
+      if (count === 0) {
+        toast.info("All test players are already on this session");
+      } else {
+        toast.success(`Added ${count} test player${count === 1 ? "" : "s"}`);
+      }
+      await load();
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to add test players"
+      );
+    } finally {
+      setAddingTestPlayers(false);
     }
   };
 
@@ -174,6 +190,7 @@ function SessionAdminContent({ sessionId }: { sessionId: string }) {
   const eligible = getEligiblePlayers(queuePlayers, {
     paymentRequired: session.paymentRequired,
     allowUnpaidInQueue: session.allowUnpaidInQueue,
+    skillMatchingMode: session.skillMatchingMode,
   });
 
   return (
@@ -238,14 +255,32 @@ function SessionAdminContent({ sessionId }: { sessionId: string }) {
       )}
 
       {(tab === "registrations" || tab === "checkin") && (
-        <PlayerList
-          players={session.players}
-          mode={tab}
-          session={session}
-          onStatus={handlePlayerStatus}
-          onRemove={handleRemovePlayer}
-          onSkillChange={handleSkillChange}
-        />
+        <>
+          <div className="mb-4 flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              onClick={handleAddTestPlayers}
+              disabled={addingTestPlayers}
+              className="rounded-full border-2 border-amber-300/60 text-amber-900 hover:bg-amber-50"
+            >
+              {addingTestPlayers ? (
+                <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+              ) : null}
+              Add test players
+            </Button>
+            <p className="flex items-center text-xs text-muted-foreground">
+              Loads roster from backend templates (skips duplicates)
+            </p>
+          </div>
+          <PlayerList
+            players={session.players}
+            mode={tab}
+            session={session}
+            onStatus={handlePlayerStatus}
+            onRemove={handleRemovePlayer}
+            onSkillChange={handleSkillChange}
+          />
+        </>
       )}
 
       {tab === "queue" && (
@@ -277,84 +312,29 @@ function SessionAdminContent({ sessionId }: { sessionId: string }) {
                 </div>
               ))
             )}
-            <Link href={`/admin/courts/${sessionId}`}>
+            <Link href={`/sessions/${sessionId}/courts`}>
               <Button className="mt-2 rounded-full bg-sisclub-green hover:bg-sisclub-green-dark">
-                Open courts
+                Manage Courts
               </Button>
             </Link>
           </CardContent>
         </Card>
       )}
 
-      {tab === "settings" && (
-        <Card className="rounded-3xl border-2 border-black/10">
-          <CardHeader>
-            <CardTitle>Session settings</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSaveSettings} className="space-y-4">
-              <div className="grid gap-3 sm:grid-cols-3">
-                <div className="space-y-2">
-                  <Label>Courts</Label>
-                  <Input name="courtCount" type="number" min={1} max={12} defaultValue={session.courtCount} className="rounded-2xl" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Target score</Label>
-                  <Input name="targetScore" type="number" min={1} defaultValue={session.targetScore} className="rounded-2xl" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Win by</Label>
-                  <Input name="winBy" type="number" min={1} defaultValue={session.winBy} className="rounded-2xl" />
-                </div>
-              </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label>Max players</Label>
-                  <Input name="maxPlayers" type="number" min={4} defaultValue={session.maxPlayers} className="rounded-2xl" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Session skill</Label>
-                  <select
-                    name="skillLevel"
-                    defaultValue={session.skillLevel}
-                    className="h-10 w-full rounded-2xl border-2 border-black/10 px-3 text-sm"
-                  >
-                    {SESSION_SKILL_LEVELS.map((l) => (
-                      <option key={l} value={l}>{l}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label>Payment amount</Label>
-                <Input name="paymentAmount" type="number" step="0.01" defaultValue={session.paymentAmount ?? ""} className="rounded-2xl" />
-              </div>
-              <div className="space-y-2">
-                <Label>Payment note</Label>
-                <Input name="paymentNote" defaultValue={session.paymentNote ?? ""} className="rounded-2xl" />
-              </div>
-              <div className="space-y-2">
-                <Label>Payment instructions</Label>
-                <Input name="paymentInstructions" defaultValue={session.paymentInstructions ?? ""} className="rounded-2xl" />
-              </div>
-              <label className="flex items-center gap-2 text-sm">
-                <input type="checkbox" name="paymentRequired" defaultChecked={session.paymentRequired} />
-                Payment required
-              </label>
-              <label className="flex items-center gap-2 text-sm">
-                <input type="checkbox" name="allowUnpaidInQueue" defaultChecked={session.allowUnpaidInQueue} />
-                Allow unpaid players in queue
-              </label>
-              <label className="flex items-center gap-2 text-sm">
-                <input type="checkbox" name="autoAssignNextMatch" defaultChecked={session.autoAssignNextMatch} />
-                Auto assign next match
-              </label>
-              <Button type="submit" disabled={saving} className="rounded-full bg-sisclub-green hover:bg-sisclub-green-dark">
-                {saving ? "Saving…" : "Save settings"}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
+      {tab === "settings" && settingsForm && (
+        <form onSubmit={handleSaveSettings} className="space-y-4">
+          <SessionForm
+            values={settingsForm}
+            onChange={setSettingsForm}
+          />
+          <Button
+            type="submit"
+            disabled={saving}
+            className="rounded-full bg-sisclub-green hover:bg-sisclub-green-dark"
+          >
+            {saving ? "Saving…" : "Save settings"}
+          </Button>
+        </form>
       )}
     </>
   );
