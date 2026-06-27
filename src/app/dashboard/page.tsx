@@ -18,7 +18,7 @@ import {
 import { useSessions } from "@/hooks/use-sessions";
 import { createClient } from "@/utils/supabase/client";
 import {
-  joinSessionRecord,
+  registerPlayerRecord,
   leaveSessionRecord,
 } from "@/utils/supabase/queries";
 
@@ -82,7 +82,7 @@ function DashboardContent() {
       setActionLoading(true);
       try {
         const supabase = createClient();
-        const playerId = await joinSessionRecord(supabase, sessionId, profile);
+        const playerId = await registerPlayerRecord(supabase, sessionId, profile);
         setJoinedPlayerId(sessionId, playerId);
         await refetch();
         toast.success("You're in! See you on court.");

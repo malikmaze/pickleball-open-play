@@ -1,9 +1,24 @@
+import { normalizePlayerSkill } from "@/lib/constants";
 import type {
+  CourtRow,
   Database,
+  MatchRow,
   PlayerRow,
   SessionRow,
 } from "@/utils/supabase/database.types";
-import type { Player, Session, SessionStatus, SkillLevel } from "@/types";
+import type {
+  Court,
+  CourtStatus,
+  Match,
+  MatchStatus,
+  Player,
+  PlayerSkillLevel,
+  PlayerStatus,
+  Session,
+  SessionSkillLevel,
+  SessionStatus,
+  WinnerTeam,
+} from "@/types";
 
 export function formatTime(time: string): string {
   return time.slice(0, 5);
@@ -22,10 +37,47 @@ export function computeSessionStatus(
 export function mapPlayer(row: PlayerRow): Player {
   return {
     id: row.id,
+    sessionId: row.session_id,
     name: row.name,
     contactNumber: row.contact_number ?? undefined,
-    skillLevel: row.skill_level as SkillLevel,
+    skillLevel: normalizePlayerSkill(row.skill_level),
+    note: row.note ?? undefined,
+    status: row.status as PlayerStatus,
+    gamesPlayed: row.games_played ?? 0,
+    lastPlayedAt: row.last_played_at ?? undefined,
+    checkedInAt: row.checked_in_at ?? undefined,
+    securedAt: row.secured_at ?? undefined,
+    isActive: row.is_active ?? true,
     joinedAt: row.joined_at,
+  };
+}
+
+export function mapCourt(row: CourtRow): Court {
+  return {
+    id: row.id,
+    sessionId: row.session_id,
+    courtNumber: row.court_number,
+    status: row.status as CourtStatus,
+    createdAt: row.created_at,
+  };
+}
+
+export function mapMatch(row: MatchRow): Match {
+  return {
+    id: row.id,
+    sessionId: row.session_id,
+    courtId: row.court_id ?? undefined,
+    teamAPlayer1Id: row.team_a_player_1!,
+    teamAPlayer2Id: row.team_a_player_2!,
+    teamBPlayer1Id: row.team_b_player_1!,
+    teamBPlayer2Id: row.team_b_player_2!,
+    teamAScore: row.team_a_score ?? undefined,
+    teamBScore: row.team_b_score ?? undefined,
+    winnerTeam: (row.winner_team as WinnerTeam) ?? undefined,
+    status: row.status as MatchStatus,
+    startedAt: row.started_at ?? undefined,
+    finishedAt: row.finished_at ?? undefined,
+    createdAt: row.created_at,
   };
 }
 
@@ -42,13 +94,22 @@ export function mapSession(
     endTime: formatTime(row.end_time),
     location: row.location,
     courtNumber: row.court_number,
-    skillLevel: row.skill_level as SkillLevel,
+    skillLevel: row.skill_level as SessionSkillLevel,
     maxPlayers: row.max_players,
     status: computeSessionStatus(
       row.status,
       mappedPlayers.length,
       row.max_players
     ),
+    courtCount: row.court_count ?? 1,
+    targetScore: row.target_score ?? 15,
+    winBy: row.win_by ?? 2,
+    paymentRequired: row.payment_required ?? false,
+    paymentAmount: row.payment_amount ?? undefined,
+    paymentNote: row.payment_note ?? undefined,
+    paymentInstructions: row.payment_instructions ?? undefined,
+    allowUnpaidInQueue: row.allow_unpaid_in_queue ?? true,
+    autoAssignNextMatch: row.auto_assign_next_match ?? false,
     players: mappedPlayers,
   };
 }
@@ -76,6 +137,15 @@ export function toSessionInsert(
     skill_level: data.skillLevel,
     max_players: data.maxPlayers,
     status: "open",
+    court_count: data.courtCount,
+    target_score: data.targetScore,
+    win_by: data.winBy,
+    payment_required: data.paymentRequired,
+    payment_amount: data.paymentAmount ?? null,
+    payment_note: data.paymentNote ?? null,
+    payment_instructions: data.paymentInstructions ?? null,
+    allow_unpaid_in_queue: data.allowUnpaidInQueue,
+    auto_assign_next_match: data.autoAssignNextMatch,
   };
 }
 
@@ -92,5 +162,38 @@ export function toSessionUpdate(
   if (data.skillLevel !== undefined) update.skill_level = data.skillLevel;
   if (data.maxPlayers !== undefined) update.max_players = data.maxPlayers;
   if (data.status !== undefined) update.status = data.status;
+  if (data.courtCount !== undefined) update.court_count = data.courtCount;
+  if (data.targetScore !== undefined) update.target_score = data.targetScore;
+  if (data.winBy !== undefined) update.win_by = data.winBy;
+  if (data.paymentRequired !== undefined)
+    update.payment_required = data.paymentRequired;
+  if (data.paymentAmount !== undefined)
+    update.payment_amount = data.paymentAmount ?? null;
+  if (data.paymentNote !== undefined) update.payment_note = data.paymentNote ?? null;
+  if (data.paymentInstructions !== undefined)
+    update.payment_instructions = data.paymentInstructions ?? null;
+  if (data.allowUnpaidInQueue !== undefined)
+    update.allow_unpaid_in_queue = data.allowUnpaidInQueue;
+  if (data.autoAssignNextMatch !== undefined)
+    update.auto_assign_next_match = data.autoAssignNextMatch;
   return update;
+}
+
+export function defaultSessionFields(): Pick<
+  Session,
+  | "courtCount"
+  | "targetScore"
+  | "winBy"
+  | "paymentRequired"
+  | "allowUnpaidInQueue"
+  | "autoAssignNextMatch"
+> {
+  return {
+    courtCount: 1,
+    targetScore: 15,
+    winBy: 2,
+    paymentRequired: false,
+    allowUnpaidInQueue: true,
+    autoAssignNextMatch: false,
+  };
 }

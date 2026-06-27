@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
@@ -24,14 +24,14 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { setJoinedPlayerId, usePlayerProfile } from "@/hooks/use-player-profile";
-import { SKILL_LEVELS } from "@/lib/constants";
+import { PLAYER_SKILL_LEVELS } from "@/lib/constants";
 import { getPlayerProfile } from "@/lib/player-profile";
 import { createClient } from "@/utils/supabase/client";
 import {
   fetchSessionById,
-  joinSessionRecord,
+  registerPlayerRecord,
 } from "@/utils/supabase/queries";
-import type { SkillLevel } from "@/types";
+import type { PlayerSkillLevel, Session } from "@/types";
 
 function JoinForm() {
   const router = useRouter();
@@ -39,14 +39,22 @@ function JoinForm() {
   const sessionId = searchParams.get("sessionId");
   const { saveProfile } = usePlayerProfile();
 
+  const [session, setSession] = useState<Session | null>(null);
   const [name, setName] = useState(() => getPlayerProfile()?.name ?? "");
   const [contactNumber, setContactNumber] = useState(
     () => getPlayerProfile()?.contactNumber ?? ""
   );
-  const [skillLevel, setSkillLevel] = useState<SkillLevel>(
-    () => getPlayerProfile()?.skillLevel ?? "Mixed"
+  const [skillLevel, setSkillLevel] = useState<PlayerSkillLevel>(
+    () => getPlayerProfile()?.skillLevel ?? "Novice"
   );
+  const [note, setNote] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!sessionId) return;
+    const supabase = createClient();
+    fetchSessionById(supabase, sessionId).then(setSession).catch(() => {});
+  }, [sessionId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,20 +63,24 @@ function JoinForm() {
       toast.error("Please enter your name");
       return;
     }
+    if (!contactNumber.trim()) {
+      toast.error("Please enter your contact number");
+      return;
+    }
 
     if (sessionId) {
       try {
         const supabase = createClient();
-        const session = await fetchSessionById(supabase, sessionId);
-        if (!session) {
+        const s = session ?? (await fetchSessionById(supabase, sessionId));
+        if (!s) {
           toast.error("Session not found");
           return;
         }
-        if (session.status === "full") {
+        if (s.status === "full") {
           toast.error("This session is full");
           return;
         }
-        if (session.status === "closed") {
+        if (s.status === "closed") {
           toast.error("This session is closed");
           return;
         }
@@ -85,14 +97,19 @@ function JoinForm() {
 
       if (sessionId) {
         const supabase = createClient();
-        const playerId = await joinSessionRecord(supabase, sessionId, saved);
+        const playerId = await registerPlayerRecord(supabase, sessionId, {
+          name: saved.name,
+          contactNumber: saved.contactNumber,
+          skillLevel: saved.skillLevel,
+          note,
+        });
         setJoinedPlayerId(sessionId, playerId);
-        toast.success("You're in! See you on court.");
+        toast.success("Registered! See you on court.");
+        router.push(`/session/${sessionId}`);
       } else {
         toast.success("Profile saved successfully");
+        router.push("/dashboard");
       }
-
-      router.push("/dashboard");
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : "Something went wrong"
@@ -105,7 +122,7 @@ function JoinForm() {
   return (
     <PageShell>
       <AppHeader
-        subtitle={sessionId ? "Join a session" : "Your player profile"}
+        subtitle={sessionId ? "Register for session" : "Your player profile"}
         backHref="/dashboard"
       />
 
@@ -113,18 +130,31 @@ function JoinForm() {
         <Card className="rounded-3xl border-2 border-black/10 shadow-md">
           <CardHeader>
             <CardTitle className="font-heading text-xl text-sisclub-green-dark">
-              {sessionId ? "Join Open Play" : "Player Profile"}
+              {sessionId ? "Register for Open Play" : "Player Profile"}
             </CardTitle>
             <CardDescription>
               {sessionId
-                ? "Tell us a bit about yourself to join this session."
+                ? "Reserve your spot. No account needed."
                 : "Save your details for faster sign-ups."}
             </CardDescription>
           </CardHeader>
           <CardContent>
+            {session?.paymentRequired && (
+              <div className="mb-5 rounded-2xl bg-amber-50 p-4 text-sm text-amber-900">
+                <p className="font-semibold">Payment required for this session</p>
+                {session.paymentAmount && <p>Amount: ₱{session.paymentAmount}</p>}
+                {session.paymentNote && <p>{session.paymentNote}</p>}
+                {session.paymentInstructions && (
+                  <p className="mt-1">{session.paymentInstructions}</p>
+                )}
+                <p className="mt-2 text-xs">
+                  You can register now. An organizer will mark you as Secured after payment.
+                </p>
+              </div>
+            )}
             <form onSubmit={handleSubmit} className="space-y-5">
               <div className="space-y-2">
-                <Label htmlFor="name">Player name *</Label>
+                <Label htmlFor="name">Name *</Label>
                 <Input
                   id="name"
                   placeholder="Your name"
@@ -136,7 +166,7 @@ function JoinForm() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="contact">Contact number (optional)</Label>
+                <Label htmlFor="contact">Contact number *</Label>
                 <Input
                   id="contact"
                   type="tel"
@@ -144,20 +174,21 @@ function JoinForm() {
                   value={contactNumber}
                   onChange={(e) => setContactNumber(e.target.value)}
                   className="h-12 rounded-2xl border-2 border-black/10"
+                  required
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="skill">Skill level</Label>
+                <Label htmlFor="skill">Skill level *</Label>
                 <Select
                   value={skillLevel}
-                  onValueChange={(v) => setSkillLevel(v as SkillLevel)}
+                  onValueChange={(v) => setSkillLevel(v as PlayerSkillLevel)}
                 >
                   <SelectTrigger className="h-12 w-full rounded-2xl border-2 border-black/10">
                     <SelectValue placeholder="Select skill level" />
                   </SelectTrigger>
                   <SelectContent>
-                    {SKILL_LEVELS.map((level) => (
+                    {PLAYER_SKILL_LEVELS.map((level) => (
                       <SelectItem key={level} value={level}>
                         {level}
                       </SelectItem>
@@ -165,6 +196,19 @@ function JoinForm() {
                   </SelectContent>
                 </Select>
               </div>
+
+              {sessionId && (
+                <div className="space-y-2">
+                  <Label htmlFor="note">Note (optional)</Label>
+                  <Input
+                    id="note"
+                    placeholder="e.g. arriving late, first time"
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    className="h-12 rounded-2xl border-2 border-black/10"
+                  />
+                </div>
+              )}
 
               <Button
                 type="submit"
@@ -177,7 +221,7 @@ function JoinForm() {
                     Saving…
                   </>
                 ) : sessionId ? (
-                  "Join Session"
+                  "Register"
                 ) : (
                   "Save Profile"
                 )}

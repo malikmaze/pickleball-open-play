@@ -22,6 +22,15 @@ export type Database = {
           max_players: number;
           status: string;
           created_at: string;
+          court_count: number;
+          target_score: number;
+          win_by: number;
+          payment_required: boolean;
+          payment_amount: number | null;
+          payment_note: string | null;
+          payment_instructions: string | null;
+          allow_unpaid_in_queue: boolean;
+          auto_assign_next_match: boolean;
         };
         Insert: {
           id?: string;
@@ -35,6 +44,15 @@ export type Database = {
           max_players: number;
           status?: string;
           created_at?: string;
+          court_count?: number;
+          target_score?: number;
+          win_by?: number;
+          payment_required?: boolean;
+          payment_amount?: number | null;
+          payment_note?: string | null;
+          payment_instructions?: string | null;
+          allow_unpaid_in_queue?: boolean;
+          auto_assign_next_match?: boolean;
         };
         Update: {
           id?: string;
@@ -48,6 +66,15 @@ export type Database = {
           max_players?: number;
           status?: string;
           created_at?: string;
+          court_count?: number;
+          target_score?: number;
+          win_by?: number;
+          payment_required?: boolean;
+          payment_amount?: number | null;
+          payment_note?: string | null;
+          payment_instructions?: string | null;
+          allow_unpaid_in_queue?: boolean;
+          auto_assign_next_match?: boolean;
         };
         Relationships: [];
       };
@@ -59,6 +86,13 @@ export type Database = {
           contact_number: string | null;
           skill_level: string;
           joined_at: string;
+          status: string;
+          note: string | null;
+          games_played: number;
+          last_played_at: string | null;
+          checked_in_at: string | null;
+          secured_at: string | null;
+          is_active: boolean;
         };
         Insert: {
           id?: string;
@@ -67,6 +101,13 @@ export type Database = {
           contact_number?: string | null;
           skill_level: string;
           joined_at?: string;
+          status?: string;
+          note?: string | null;
+          games_played?: number;
+          last_played_at?: string | null;
+          checked_in_at?: string | null;
+          secured_at?: string | null;
+          is_active?: boolean;
         };
         Update: {
           id?: string;
@@ -75,6 +116,13 @@ export type Database = {
           contact_number?: string | null;
           skill_level?: string;
           joined_at?: string;
+          status?: string;
+          note?: string | null;
+          games_played?: number;
+          last_played_at?: string | null;
+          checked_in_at?: string | null;
+          secured_at?: string | null;
+          is_active?: boolean;
         };
         Relationships: [
           {
@@ -85,6 +133,89 @@ export type Database = {
             referencedColumns: ["id"];
           },
         ];
+      };
+      courts: {
+        Row: {
+          id: string;
+          session_id: string;
+          court_number: number;
+          status: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          session_id: string;
+          court_number: number;
+          status?: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          session_id?: string;
+          court_number?: number;
+          status?: string;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "courts_session_id_fkey";
+            columns: ["session_id"];
+            isOneToOne: false;
+            referencedRelation: "sessions";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      matches: {
+        Row: {
+          id: string;
+          session_id: string;
+          court_id: string | null;
+          team_a_player_1: string | null;
+          team_a_player_2: string | null;
+          team_b_player_1: string | null;
+          team_b_player_2: string | null;
+          team_a_score: number | null;
+          team_b_score: number | null;
+          winner_team: string | null;
+          status: string;
+          started_at: string | null;
+          finished_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          session_id: string;
+          court_id?: string | null;
+          team_a_player_1?: string | null;
+          team_a_player_2?: string | null;
+          team_b_player_1?: string | null;
+          team_b_player_2?: string | null;
+          team_a_score?: number | null;
+          team_b_score?: number | null;
+          winner_team?: string | null;
+          status?: string;
+          started_at?: string | null;
+          finished_at?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          session_id?: string;
+          court_id?: string | null;
+          team_a_player_1?: string | null;
+          team_a_player_2?: string | null;
+          team_b_player_1?: string | null;
+          team_b_player_2?: string | null;
+          team_a_score?: number | null;
+          team_b_score?: number | null;
+          winner_team?: string | null;
+          status?: string;
+          started_at?: string | null;
+          finished_at?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
       };
       admins: {
         Row: {
@@ -119,3 +250,5 @@ export type Database = {
 
 export type SessionRow = Database["public"]["Tables"]["sessions"]["Row"];
 export type PlayerRow = Database["public"]["Tables"]["players"]["Row"];
+export type CourtRow = Database["public"]["Tables"]["courts"]["Row"];
+export type MatchRow = Database["public"]["Tables"]["matches"]["Row"];
