@@ -13,6 +13,7 @@ import {
   Lock,
   Unlock,
   LogOut,
+  Play,
 } from "lucide-react";
 import { AppHeader } from "@/components/app-header";
 import { ConfirmDialog } from "@/components/confirm-dialog";
@@ -32,18 +33,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useSessions } from "@/hooks/use-sessions";
-import { SESSION_SKILL_LEVELS } from "@/lib/constants";
+import {
+  SessionForm,
+  emptySessionForm,
+  sessionFormToPayload,
+  sessionToFormValues,
+} from "@/components/admin/session-form";
 import { defaultSessionFields } from "@/lib/sessions";
+import { seedSamplePlaySession } from "@/lib/sample-play";
 import { createClient } from "@/utils/supabase/client";
 import {
   clearSessionPlayersRecord,
@@ -52,60 +50,30 @@ import {
   toggleSessionClosedRecord,
   updateSessionRecord,
 } from "@/utils/supabase/queries";
-import type { Session, SessionSkillLevel } from "@/types";
-
-interface SessionFormData {
-  title: string;
-  date: string;
-  startTime: string;
-  endTime: string;
-  location: string;
-  courtNumber: string;
-  skillLevel: SessionSkillLevel;
-  maxPlayers: number;
-}
-
-const emptyForm = (): SessionFormData => ({
-  title: "",
-  date: new Date().toISOString().split("T")[0],
-  startTime: "08:00",
-  endTime: "10:00",
-  location: "SisClub Courts",
-  courtNumber: "Court 1",
-  skillLevel: "Mixed",
-  maxPlayers: 8,
-});
+import type { Session } from "@/types";
 
 export default function AdminPage() {
   const router = useRouter();
   const { sessions, isLoading, error, refetch } = useSessions();
   const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState<SessionFormData>(emptyForm());
+  const [form, setForm] = useState(emptySessionForm());
   const [isSaving, setIsSaving] = useState(false);
 
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [clearTarget, setClearTarget] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [sampleLoading, setSampleLoading] = useState(false);
 
   const openCreate = () => {
     setEditingId(null);
-    setForm(emptyForm());
+    setForm(emptySessionForm());
     setFormOpen(true);
   };
 
   const openEdit = (session: Session) => {
     setEditingId(session.id);
-    setForm({
-      title: session.title,
-      date: session.date,
-      startTime: session.startTime,
-      endTime: session.endTime,
-      location: session.location,
-      courtNumber: session.courtNumber,
-      skillLevel: session.skillLevel,
-      maxPlayers: session.maxPlayers,
-    });
+    setForm(sessionToFormValues(session));
     setFormOpen(true);
   };
 
@@ -121,29 +89,14 @@ export default function AdminPage() {
     const supabase = createClient();
 
     try {
+      const payload = sessionFormToPayload(form);
       if (editingId) {
-        await updateSessionRecord(supabase, editingId, {
-          title: form.title.trim(),
-          date: form.date,
-          startTime: form.startTime,
-          endTime: form.endTime,
-          location: form.location.trim(),
-          courtNumber: form.courtNumber.trim(),
-          skillLevel: form.skillLevel,
-          maxPlayers: form.maxPlayers,
-        });
+        await updateSessionRecord(supabase, editingId, payload);
         toast.success("Session updated");
       } else {
         await createSessionRecord(supabase, {
           ...defaultSessionFields(),
-          title: form.title.trim(),
-          date: form.date,
-          startTime: form.startTime,
-          endTime: form.endTime,
-          location: form.location.trim(),
-          courtNumber: form.courtNumber.trim(),
-          skillLevel: form.skillLevel,
-          maxPlayers: form.maxPlayers,
+          ...payload,
         });
         toast.success("Session created");
       }
@@ -223,6 +176,23 @@ export default function AdminPage() {
     router.refresh();
   };
 
+  const handleSamplePlay = async () => {
+    setSampleLoading(true);
+    try {
+      const supabase = createClient();
+      const sessionId = await seedSamplePlaySession(supabase);
+      await refetch();
+      toast.success("Sample play created!");
+      router.push(`/sessions/${sessionId}/courts`);
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to create sample play"
+      );
+    } finally {
+      setSampleLoading(false);
+    }
+  };
+
   return (
     <PageShell>
       <AppHeader subtitle="Organizer tools" backHref="/" />
@@ -238,6 +208,19 @@ export default function AdminPage() {
             </p>
           </div>
           <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={handleSamplePlay}
+              disabled={sampleLoading}
+              className="rounded-full border-2 border-sisclub-pink/40 text-sisclub-pink-dark hover:bg-sisclub-pink-soft"
+            >
+              {sampleLoading ? (
+                <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+              ) : (
+                <Play className="mr-1 h-4 w-4" />
+              )}
+              Sample play
+            </Button>
             <Button
               onClick={openCreate}
               className="rounded-full border-2 border-black/10 bg-sisclub-green font-semibold text-white shadow-sm hover:bg-sisclub-green-dark"
@@ -274,12 +257,27 @@ export default function AdminPage() {
           <Card className="rounded-3xl border-2 border-dashed border-black/10 bg-white/60">
             <CardContent className="py-12 text-center">
               <p className="text-muted-foreground">No sessions yet.</p>
-              <Button
-                onClick={openCreate}
-                className="mt-4 rounded-full bg-sisclub-green font-semibold hover:bg-sisclub-green-dark"
-              >
-                Create first session
-              </Button>
+              <div className="mt-4 flex flex-col items-center gap-2 sm:flex-row sm:justify-center">
+                <Button
+                  onClick={handleSamplePlay}
+                  disabled={sampleLoading}
+                  variant="outline"
+                  className="rounded-full border-2 border-sisclub-pink/40 text-sisclub-pink-dark hover:bg-sisclub-pink-soft"
+                >
+                  {sampleLoading ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Play className="mr-2 h-4 w-4" />
+                  )}
+                  Load sample play
+                </Button>
+                <Button
+                  onClick={openCreate}
+                  className="rounded-full bg-sisclub-green font-semibold hover:bg-sisclub-green-dark"
+                >
+                  Create first session
+                </Button>
+              </div>
             </CardContent>
           </Card>
         ) : (
@@ -314,6 +312,12 @@ export default function AdminPage() {
                   </p>
 
                   <div className="flex flex-wrap gap-2">
+                    <Link
+                      href={`/sessions/${session.id}/courts`}
+                      className="inline-flex h-7 items-center rounded-full bg-sisclub-pink px-3 text-xs font-medium text-white hover:bg-sisclub-pink-dark"
+                    >
+                      Live Court View
+                    </Link>
                     <Link
                       href={`/admin/sessions/${session.id}`}
                       className="inline-flex h-7 items-center rounded-full bg-sisclub-green px-3 text-xs font-medium text-white hover:bg-sisclub-green-dark"
@@ -375,128 +379,14 @@ export default function AdminPage() {
       </div>
 
       <Dialog open={formOpen} onOpenChange={setFormOpen}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto rounded-3xl border-2 border-black/10 sm:max-w-lg">
+        <DialogContent className="max-h-[90vh] overflow-y-auto rounded-3xl border-2 border-black/10 sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle className="font-heading text-sisclub-green-dark">
               {editingId ? "Edit Session" : "Create Session"}
             </DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSave} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="title">Title</Label>
-              <Input
-                id="title"
-                value={form.title}
-                onChange={(e) => setForm({ ...form, title: e.target.value })}
-                placeholder="Morning Open Play"
-                className="rounded-2xl border-2 border-black/10"
-                required
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <Label htmlFor="date">Date</Label>
-                <Input
-                  id="date"
-                  type="date"
-                  value={form.date}
-                  onChange={(e) => setForm({ ...form, date: e.target.value })}
-                  className="rounded-2xl border-2 border-black/10"
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="maxPlayers">Max players</Label>
-                <Input
-                  id="maxPlayers"
-                  type="number"
-                  min={2}
-                  max={32}
-                  value={form.maxPlayers}
-                  onChange={(e) =>
-                    setForm({ ...form, maxPlayers: Number(e.target.value) })
-                  }
-                  className="rounded-2xl border-2 border-black/10"
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <Label htmlFor="startTime">Start time</Label>
-                <Input
-                  id="startTime"
-                  type="time"
-                  value={form.startTime}
-                  onChange={(e) =>
-                    setForm({ ...form, startTime: e.target.value })
-                  }
-                  className="rounded-2xl border-2 border-black/10"
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="endTime">End time</Label>
-                <Input
-                  id="endTime"
-                  type="time"
-                  value={form.endTime}
-                  onChange={(e) =>
-                    setForm({ ...form, endTime: e.target.value })
-                  }
-                  className="rounded-2xl border-2 border-black/10"
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="location">Location</Label>
-              <Input
-                id="location"
-                value={form.location}
-                onChange={(e) => setForm({ ...form, location: e.target.value })}
-                className="rounded-2xl border-2 border-black/10"
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="court">Court</Label>
-              <Input
-                id="court"
-                value={form.courtNumber}
-                onChange={(e) =>
-                  setForm({ ...form, courtNumber: e.target.value })
-                }
-                className="rounded-2xl border-2 border-black/10"
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Skill level</Label>
-              <Select
-                value={form.skillLevel}
-                onValueChange={(v) =>
-                  setForm({ ...form, skillLevel: v as SessionSkillLevel })
-                }
-              >
-                <SelectTrigger className="w-full rounded-2xl border-2 border-black/10">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {SESSION_SKILL_LEVELS.map((level) => (
-                    <SelectItem key={level} value={level}>
-                      {level}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
+            <SessionForm values={form} onChange={setForm} />
             <Button
               type="submit"
               disabled={isSaving}

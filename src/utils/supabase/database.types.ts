@@ -31,6 +31,9 @@ export type Database = {
           payment_instructions: string | null;
           allow_unpaid_in_queue: boolean;
           auto_assign_next_match: boolean;
+          allow_side_change: boolean;
+          side_change_point: number;
+          skill_matching_mode: string;
         };
         Insert: {
           id?: string;
@@ -53,6 +56,9 @@ export type Database = {
           payment_instructions?: string | null;
           allow_unpaid_in_queue?: boolean;
           auto_assign_next_match?: boolean;
+          allow_side_change?: boolean;
+          side_change_point?: number;
+          skill_matching_mode?: string;
         };
         Update: {
           id?: string;
@@ -75,6 +81,9 @@ export type Database = {
           payment_instructions?: string | null;
           allow_unpaid_in_queue?: boolean;
           auto_assign_next_match?: boolean;
+          allow_side_change?: boolean;
+          side_change_point?: number;
+          skill_matching_mode?: string;
         };
         Relationships: [];
       };
@@ -141,6 +150,9 @@ export type Database = {
           court_number: number;
           status: string;
           created_at: string;
+          sides_swapped: boolean;
+          side_change_count: number;
+          last_side_change_at: string | null;
         };
         Insert: {
           id?: string;
@@ -148,6 +160,9 @@ export type Database = {
           court_number: number;
           status?: string;
           created_at?: string;
+          sides_swapped?: boolean;
+          side_change_count?: number;
+          last_side_change_at?: string | null;
         };
         Update: {
           id?: string;
@@ -155,6 +170,9 @@ export type Database = {
           court_number?: number;
           status?: string;
           created_at?: string;
+          sides_swapped?: boolean;
+          side_change_count?: number;
+          last_side_change_at?: string | null;
         };
         Relationships: [
           {
@@ -217,6 +235,66 @@ export type Database = {
         };
         Relationships: [];
       };
+      session_activity: {
+        Row: {
+          id: string;
+          session_id: string;
+          court_id: string | null;
+          message: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          session_id: string;
+          court_id?: string | null;
+          message: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          session_id?: string;
+          court_id?: string | null;
+          message?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      test_player_templates: {
+        Row: {
+          id: string;
+          name: string;
+          skill_level: string;
+          default_status: string;
+          games_played: number;
+          contact_number: string | null;
+          note: string | null;
+          sort_order: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          skill_level: string;
+          default_status?: string;
+          games_played?: number;
+          contact_number?: string | null;
+          note?: string | null;
+          sort_order?: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          skill_level?: string;
+          default_status?: string;
+          games_played?: number;
+          contact_number?: string | null;
+          note?: string | null;
+          sort_order?: number;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       admins: {
         Row: {
           id: string;
@@ -241,6 +319,10 @@ export type Database = {
       is_admin: {
         Args: Record<string, never>;
         Returns: boolean;
+      };
+      add_test_players_to_session: {
+        Args: { p_session_id: string };
+        Returns: number;
       };
     };
     Enums: Record<string, never>;

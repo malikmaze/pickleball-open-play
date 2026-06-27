@@ -11,6 +11,7 @@ Built with **Next.js**, **TypeScript**, **Tailwind CSS**, **shadcn/ui**, **Supab
 - **Check-in** — moderators mark Present, Secured, No Show
 - **Fair queue engine** — skill-matched groups of 4, balanced teams, games-played priority
 - **Court management** — assign matches, record scores, winner animation
+- **Public live courts** — `/sessions/[sessionId]/courts` (no login; admin controls when signed in)
 - **Player status page** — queue position, games played, payment info
 
 ## Player flow
@@ -18,20 +19,21 @@ Built with **Next.js**, **TypeScript**, **Tailwind CSS**, **shadcn/ui**, **Supab
 1. Browse today's sessions on `/dashboard`
 2. Register at `/join?sessionId=...`
 3. Track status at `/session/[sessionId]`
-4. Organizer checks you in → you enter the queue
-5. When called, you play → return to queue after the match
+4. Watch live courts at `/sessions/[sessionId]/courts`
+5. Organizer checks you in → you enter the queue
+6. When called, you play → return to queue after the match
 
 ## Admin flow
 
 1. Sign in at `/login`
-2. Create sessions at `/admin`
+2. Create sessions at `/admin`, or click **Sample play** for a demo session with live courts
 3. Open **Manage** → `/admin/sessions/[id]`
    - **Overview** — snapshot
    - **Registrations** — all sign-ups
    - **Check-in** — mark Present / Secured / No Show
    - **Queue** — who's up next
-   - **Courts** — `/admin/courts/[id]`
-   - **Settings** — courts, scoring, payment rules
+   - **Courts** — `/sessions/[id]/courts` (public; admin controls when signed in)
+   - **Settings** — full open play config (payment, match rules, courts, queue)
 
 ## Supabase setup
 
@@ -41,6 +43,8 @@ In Supabase **SQL Editor**:
 
 1. `supabase/migrations/001_initial_schema.sql`
 2. `supabase/migrations/002_registration_queue_courts.sql`
+3. `supabase/migrations/003_court_live_view.sql`
+4. `supabase/migrations/004_test_players.sql`
 
 ### 2. Environment variables
 
@@ -62,15 +66,29 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
 insert into public.admins (email) values ('your-email@example.com');
 ```
 
+### 4. Test players (optional)
+
+Migration `004_test_players.sql` creates:
+- `test_player_templates` — 24 reusable demo players (including Test Ace, Test Smash, etc.)
+- `add_test_players_to_session(session_id)` — admin-only function to copy templates into a session
+
+From the app: **Admin → Manage session → Registrations → Add test players**
+
+Or in SQL Editor:
+
+```sql
+select public.add_test_players_to_session('your-session-uuid-here');
+```
+
 ## Local development
 
 ```bash
-npm install
-npm run dev
+pnpm install
+pnpm dev
 ```
 
 ```bash
-npm run build
+pnpm build
 ```
 
 ## Queue engine

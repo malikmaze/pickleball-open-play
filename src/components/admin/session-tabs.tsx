@@ -9,7 +9,7 @@ const tabs = [
   { id: "registrations", label: "Registrations" },
   { id: "checkin", label: "Check-in" },
   { id: "queue", label: "Queue" },
-  { id: "courts", label: "Courts", href: (id: string) => `/admin/courts/${id}` },
+  { id: "courts", label: "Courts", href: (id: string) => `/sessions/${id}/courts` },
   { id: "settings", label: "Settings" },
 ] as const;
 
@@ -17,7 +17,7 @@ export function SessionAdminTabs({ sessionId }: { sessionId: string }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const activeTab = searchParams.get("tab") ?? "overview";
-  const isCourtsPage = pathname.includes("/admin/courts/");
+  const isCourtsPage = pathname.includes("/sessions/") && pathname.endsWith("/courts");
 
   return (
     <nav className="mb-6 flex gap-2 overflow-x-auto pb-1">
