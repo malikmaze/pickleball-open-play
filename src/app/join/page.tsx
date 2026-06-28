@@ -180,7 +180,7 @@ function JoinForm() {
   return (
     <PageShell>
       <AppHeader subtitle="Join open play" backHref="/dashboard" />
-      <div className="py-6 space-y-4">
+      <div className="py-4 space-y-4 sm:py-6">
         {sessionLoading ? (
           <div className="flex justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-sisclub-green" />

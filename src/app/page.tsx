@@ -7,9 +7,9 @@ import { APP_NAME, APP_TAGLINE } from "@/lib/constants";
 export default function LandingPage() {
   return (
     <PageShell className="flex flex-col">
-      <div className="flex flex-1 flex-col items-center justify-center px-2 py-12 text-center">
-        <div className="animate-fade-in-up mb-8">
-          <div className="relative mx-auto h-48 w-48 overflow-hidden rounded-3xl border-2 border-black/10 shadow-lg sm:h-56 sm:w-56">
+      <div className="flex flex-1 flex-col items-center justify-center px-2 py-8 sm:py-12 text-center">
+        <div className="animate-fade-in-up mb-6 sm:mb-8">
+          <div className="relative mx-auto h-40 w-40 overflow-hidden rounded-3xl border-2 border-black/10 shadow-lg sm:h-48 sm:w-48 md:h-56 md:w-56">
             <Image
               src="/images/hero-poster.png"
               alt="Pickleball Open Play"
@@ -36,15 +36,15 @@ export default function LandingPage() {
           </span>
         </div>
 
-        <h1 className="animate-fade-in-up-delay-1 font-heading text-4xl font-bold tracking-tight text-sisclub-green-dark sm:text-5xl">
+        <h1 className="animate-fade-in-up-delay-1 font-heading text-3xl font-bold tracking-tight text-sisclub-green-dark sm:text-4xl md:text-5xl">
           {APP_NAME}
         </h1>
 
-        <p className="animate-fade-in-up-delay-2 mt-4 max-w-sm text-lg text-muted-foreground">
+        <p className="animate-fade-in-up-delay-2 mt-3 max-w-md text-base text-muted-foreground sm:mt-4 sm:text-lg">
           {APP_TAGLINE}
         </p>
 
-        <div className="animate-fade-in-up-delay-3 mt-10 flex w-full max-w-xs flex-col gap-3">
+        <div className="animate-fade-in-up-delay-3 mt-8 flex w-full max-w-sm flex-col gap-3 sm:mt-10 sm:max-w-xs">
           <Link
             href="/dashboard"
             className="inline-flex h-14 items-center justify-center rounded-full border-2 border-black/10 bg-sisclub-green text-base font-bold text-white shadow-md transition-all hover:-translate-y-0.5 hover:bg-sisclub-green-dark hover:shadow-lg"

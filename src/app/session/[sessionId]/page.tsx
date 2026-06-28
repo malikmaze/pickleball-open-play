@@ -379,7 +379,7 @@ export default function PublicSessionPage({
   return (
     <PageShell>
       <AppHeader subtitle="Session status" backHref="/dashboard" />
-      <div className="py-6">
+      <div className="py-4 sm:py-6">
         {sessionId ? (
           <Suspense>
             <SessionStatusContent sessionId={sessionId} />

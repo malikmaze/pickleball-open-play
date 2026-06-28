@@ -100,7 +100,7 @@ export function SessionCard({
     >
       <CardHeader className="space-y-3 pb-3">
         <div className="flex items-start justify-between gap-2">
-          <CardTitle className="font-heading text-lg font-bold text-sisclub-green-dark">
+          <CardTitle className="font-heading text-base font-bold text-sisclub-green-dark sm:text-lg">
             {session.title}
           </CardTitle>
           <StatusBadge status={session.status} />

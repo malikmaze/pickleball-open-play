@@ -21,9 +21,9 @@ export default function AdminCourtsPage({
   }, [params]);
 
   return (
-    <PageShell>
-      <AppHeader subtitle="Manage courts" backHref="/admin" />
-      <div className="py-6">
+    <PageShell size="wide">
+      <AppHeader subtitle="Manage courts" backHref="/admin" size="wide" />
+      <div className="py-4 sm:py-6">
         {sessionId ? (
           <>
             <div className="mb-4 space-y-4">
@@ -42,7 +42,7 @@ export default function AdminCourtsPage({
               isAdmin
               header={
                 <div>
-                  <h2 className="font-heading text-2xl font-bold text-sisclub-green-dark">
+                  <h2 className="font-heading text-xl font-bold text-sisclub-green-dark sm:text-2xl">
                     Manage Courts
                   </h2>
                   <p className="text-sm text-muted-foreground">

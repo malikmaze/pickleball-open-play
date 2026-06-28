@@ -31,7 +31,7 @@ export function LiveSessionHeader({ session }: { session: Session }) {
   return (
     <div className="space-y-3">
       <div>
-        <h1 className="font-heading text-2xl font-bold text-sisclub-green-dark md:text-3xl">
+        <h1 className="font-heading text-xl font-bold text-sisclub-green-dark sm:text-2xl md:text-3xl">
           {session.title}
         </h1>
         <p className="text-sm text-muted-foreground">Live open play</p>

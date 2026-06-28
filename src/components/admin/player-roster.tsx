@@ -196,7 +196,7 @@ export function PlayerRoster({
                           onSkillChange(player.id, v as PlayerSkillLevel)
                         }
                       >
-                        <SelectTrigger className="h-8 w-40 rounded-full">
+                        <SelectTrigger className="h-9 w-full rounded-full sm:h-8 sm:w-40">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>

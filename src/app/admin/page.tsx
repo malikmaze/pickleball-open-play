@@ -207,25 +207,25 @@ export default function AdminPage() {
   };
 
   return (
-    <PageShell>
-      <AppHeader subtitle="Admin dashboard" backHref="/" />
+    <PageShell size="wide">
+      <AppHeader subtitle="Admin dashboard" backHref="/" size="wide" />
 
-      <div className="py-6">
-        <div className="mb-6 flex items-center justify-between gap-4">
+      <div className="py-4 sm:py-6">
+        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h2 className="font-heading text-2xl font-bold text-sisclub-green-dark">
+            <h2 className="font-heading text-xl font-bold text-sisclub-green-dark sm:text-2xl">
               Manage Sessions
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">
               Create and manage open play sessions
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end">
             <Button
               variant="outline"
               onClick={handleSamplePlay}
               disabled={sampleLoading}
-              className="rounded-full border-2 border-sisclub-pink/40 text-sisclub-pink-dark hover:bg-sisclub-pink-soft"
+              className="min-h-10 flex-1 rounded-full border-2 border-sisclub-pink/40 text-sisclub-pink-dark hover:bg-sisclub-pink-soft sm:flex-none"
             >
               {sampleLoading ? (
                 <Loader2 className="mr-1 h-4 w-4 animate-spin" />
@@ -236,7 +236,7 @@ export default function AdminPage() {
             </Button>
             <Button
               onClick={openCreate}
-              className="rounded-full border-2 border-black/10 bg-sisclub-green font-semibold text-white shadow-sm hover:bg-sisclub-green-dark"
+              className="min-h-10 flex-1 rounded-full border-2 border-black/10 bg-sisclub-green font-semibold text-white shadow-sm hover:bg-sisclub-green-dark sm:flex-none"
             >
               <Plus className="mr-1 h-4 w-4" />
               New
@@ -319,12 +319,12 @@ export default function AdminPage() {
                 className="rounded-3xl border-2 border-black/10 shadow-md"
               >
                 <CardHeader className="pb-2">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
                       <CardTitle className="font-heading text-lg text-sisclub-green-dark">
                         {session.title}
                       </CardTitle>
-                      <CardDescription className="mt-1">
+                      <CardDescription className="mt-1 break-words">
                         {formatSessionDate(session.date)} · {session.startTime}{" "}
                         – {session.endTime} · {session.courtNumber}
                       </CardDescription>
