@@ -16,8 +16,19 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { SESSION_SKILL_LEVELS, SKILL_MATCHING_MODES } from "@/lib/constants";
+import {
+  FREE_SESSION_PAYMENT_NOTE,
+  MAX_SESSION_PLAYERS,
+  SESSION_SKILL_LEVELS,
+  SKILL_MATCHING_MODES,
+} from "@/lib/constants";
+import {
+  clampSessionMaxPlayers,
+  MIN_SESSION_PLAYERS,
+  sanitizeIntegerTyping,
+} from "@/lib/numbers";
 import type { SessionSkillLevel, SkillMatchingMode } from "@/types";
+import { cn } from "@/lib/utils";
 
 export interface SessionFormValues {
   title: string;
@@ -145,14 +156,38 @@ export function SessionForm({
                 <Label htmlFor="maxPlayers">Max players</Label>
                 <Input
                   id="maxPlayers"
-                  type="number"
-                  min={4}
-                  max={64}
-                  value={values.maxPlayers}
-                  onChange={(e) => set("maxPlayers", Number(e.target.value))}
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  min={MIN_SESSION_PLAYERS}
+                  max={MAX_SESSION_PLAYERS}
+                  value={
+                    values.maxPlayers > 0 ? String(values.maxPlayers) : ""
+                  }
+                  onChange={(e) => {
+                    const sanitized = sanitizeIntegerTyping(e.target.value, 3);
+                    if (sanitized === "") {
+                      set("maxPlayers", 0);
+                      return;
+                    }
+                    const parsed = parseInt(sanitized, 10);
+                    set(
+                      "maxPlayers",
+                      Number.isNaN(parsed) ? 0 : parsed
+                    );
+                  }}
+                  onBlur={() => {
+                    set(
+                      "maxPlayers",
+                      clampSessionMaxPlayers(values.maxPlayers)
+                    );
+                  }}
                   className="rounded-2xl border-2 border-black/10"
                   required
                 />
+                <p className="text-xs text-muted-foreground">
+                  {MIN_SESSION_PLAYERS}–{MAX_SESSION_PLAYERS} players
+                </p>
               </div>
             </div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -232,8 +267,26 @@ export function SessionForm({
             id="paymentRequired"
             label="Require payment"
             checked={values.paymentRequired}
-            onChange={(v) => set("paymentRequired", v)}
+            onChange={(v) =>
+              onChange({
+                ...values,
+                paymentRequired: v,
+                allowUnpaidInQueue: v ? values.allowUnpaidInQueue : true,
+              })
+            }
           />
+          {!values.paymentRequired && (
+            <p className="rounded-2xl border border-sisclub-green/25 bg-sisclub-green/10 px-3 py-2 text-sm font-medium text-sisclub-green-dark">
+              {FREE_SESSION_PAYMENT_NOTE} Players will see this on the schedule
+              and join form.
+            </p>
+          )}
+          <div
+            className={cn(
+              "space-y-3",
+              !values.paymentRequired && "pointer-events-none opacity-50"
+            )}
+          >
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-2">
               <Label>Payment amount</Label>
@@ -255,6 +308,7 @@ export function SessionForm({
                 onChange={(e) => set("paymentNote", e.target.value)}
                 placeholder="e.g. GCash"
                 className="rounded-2xl border-2 border-black/10"
+                disabled={!values.paymentRequired}
               />
             </div>
           </div>
@@ -264,9 +318,11 @@ export function SessionForm({
               value={values.paymentInstructions}
               onChange={(e) => set("paymentInstructions", e.target.value)}
               rows={2}
-              className="w-full rounded-2xl border-2 border-black/10 bg-transparent px-3 py-2 text-sm"
+              className="w-full rounded-2xl border-2 border-black/10 bg-transparent px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
               placeholder="Send payment to…"
+              disabled={!values.paymentRequired}
             />
+          </div>
           </div>
         </CardContent>
       </Card>
@@ -369,12 +425,14 @@ export function SessionForm({
               fills courts faster.
             </p>
           </div>
-          <CheckboxField
-            id="allowUnpaidInQueue"
-            label="Allow unpaid players in queue"
-            checked={values.allowUnpaidInQueue}
-            onChange={(v) => set("allowUnpaidInQueue", v)}
-          />
+          {values.paymentRequired && (
+            <CheckboxField
+              id="allowUnpaidInQueue"
+              label="Allow unpaid players in queue"
+              checked={values.allowUnpaidInQueue}
+              onChange={(v) => set("allowUnpaidInQueue", v)}
+            />
+          )}
           <CheckboxField
             id="autoAssignNextMatch"
             label="Auto assign next match"
@@ -396,17 +454,24 @@ export function sessionFormToPayload(values: SessionFormValues) {
     location: values.location.trim(),
     courtNumber: values.courtNumber.trim(),
     skillLevel: values.skillLevel,
-    maxPlayers: values.maxPlayers,
+    maxPlayers: clampSessionMaxPlayers(values.maxPlayers),
     courtCount: values.courtCount,
     targetScore: values.targetScore,
     winBy: values.winBy,
     paymentRequired: values.paymentRequired,
-    paymentAmount: values.paymentAmount
-      ? Number(values.paymentAmount)
-      : undefined,
-    paymentNote: values.paymentNote.trim() || undefined,
-    paymentInstructions: values.paymentInstructions.trim() || undefined,
-    allowUnpaidInQueue: values.allowUnpaidInQueue,
+    paymentAmount:
+      values.paymentRequired && values.paymentAmount
+        ? Number(values.paymentAmount)
+        : undefined,
+    paymentNote:
+      values.paymentRequired ? values.paymentNote.trim() || undefined : undefined,
+    paymentInstructions:
+      values.paymentRequired
+        ? values.paymentInstructions.trim() || undefined
+        : undefined,
+    allowUnpaidInQueue: values.paymentRequired
+      ? values.allowUnpaidInQueue
+      : true,
     autoAssignNextMatch: values.autoAssignNextMatch,
     allowSideChange: values.allowSideChange,
     sideChangePoint: values.sideChangePoint,

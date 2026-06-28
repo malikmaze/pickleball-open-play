@@ -14,7 +14,9 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { getJoinedPlayerIds } from "@/hooks/use-player-profile";
+import { FreeSessionBadge } from "@/components/free-session-badge";
 import { formatSessionDate } from "@/lib/sessions";
+import { cn } from "@/lib/utils";
 import { useSessions } from "@/hooks/use-sessions";
 
 function LivePicker() {
@@ -68,23 +70,31 @@ function LivePicker() {
         ).length;
 
         return (
-          <Card
-            key={session.id}
-            className={
-              isJoined
-                ? "rounded-3xl border-2 border-sisclub-green/30 shadow-sm ring-1 ring-sisclub-green/20"
-                : "rounded-3xl border-2 border-black/10 shadow-sm transition-all hover:shadow-md"
-            }
-          >
-            <CardHeader className="pb-2">
-              <CardTitle className="font-heading text-lg text-sisclub-green-dark">
-                {session.title}
-                {isJoined && (
-                  <span className="ml-2 text-xs font-semibold text-sisclub-green">
-                    · You&apos;re in
-                  </span>
+          <div key={session.id} className="relative">
+            {!session.paymentRequired && (
+              <FreeSessionBadge variant="sticker" />
+            )}
+            <Card
+              className={
+                isJoined
+                  ? "rounded-3xl border-2 border-sisclub-green/30 shadow-sm ring-1 ring-sisclub-green/20"
+                  : "rounded-3xl border-2 border-black/10 shadow-sm transition-all hover:shadow-md"
+              }
+            >
+              <CardHeader
+                className={cn(
+                  "pb-2",
+                  !session.paymentRequired && "pr-[4.75rem] pt-1"
                 )}
-              </CardTitle>
+              >
+                <CardTitle className="font-heading text-lg text-sisclub-green-dark">
+                  {session.title}
+                  {isJoined && (
+                    <span className="ml-2 text-xs font-semibold text-sisclub-green">
+                      · You&apos;re in
+                    </span>
+                  )}
+                </CardTitle>
               <p className="text-sm text-muted-foreground">
                 {formatSessionDate(session.date)} · {session.location} ·{" "}
                 {session.courtCount} courts
@@ -105,6 +115,7 @@ function LivePicker() {
               </Link>
             </CardContent>
           </Card>
+          </div>
         );
       })}
     </div>

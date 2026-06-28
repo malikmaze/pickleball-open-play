@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { toast } from "sonner";
+import { ContactNumberInput } from "@/components/contact-number-input";
 import { AppHeader } from "@/components/app-header";
 import { PageShell } from "@/components/page-shell";
 import { Button } from "@/components/ui/button";
@@ -24,6 +25,7 @@ import {
 } from "@/components/ui/card";
 import { usePlayerProfile } from "@/hooks/use-player-profile";
 import { PLAYER_SKILL_LEVELS, PROFILE_GENDERS, normalizeProfileGender } from "@/lib/constants";
+import { getPhilippineMobileError, parsePhilippineMobile } from "@/lib/phone";
 import type { PlayerSkillLevel, ProfileGender } from "@/types";
 
 export default function ProfilePage() {
@@ -59,6 +61,7 @@ function ProfileForm({
   const [contactNumber, setContactNumber] = useState(initial.contactNumber);
   const [gender, setGender] = useState<ProfileGender>(initial.gender);
   const [skillLevel, setSkillLevel] = useState<PlayerSkillLevel>(initial.skillLevel);
+  const [contactError, setContactError] = useState<string | null>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -68,7 +71,18 @@ function ProfileForm({
       return;
     }
 
-    onSave({ name, contactNumber, gender, skillLevel });
+    let normalizedContact = "";
+    if (contactNumber.trim()) {
+      const mobileError = getPhilippineMobileError(contactNumber);
+      if (mobileError) {
+        toast.error(mobileError);
+        setContactError(mobileError);
+        return;
+      }
+      normalizedContact = parsePhilippineMobile(contactNumber)!;
+    }
+
+    onSave({ name, contactNumber: normalizedContact, gender, skillLevel });
     toast.success("Profile saved for this browser session");
   };
 
@@ -98,17 +112,16 @@ function ProfileForm({
                   required
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="contact">Contact number</Label>
-                <Input
-                  id="contact"
-                  type="tel"
-                  value={contactNumber}
-                  onChange={(e) => setContactNumber(e.target.value)}
-                  placeholder="09XX XXX XXXX"
-                  className="h-12 rounded-2xl border-2 border-black/10"
-                />
-              </div>
+              <ContactNumberInput
+                label="Contact number"
+                value={contactNumber}
+                onChange={(value) => {
+                  setContactNumber(value);
+                  setContactError(null);
+                }}
+                error={contactError}
+                hint="Philippine mobile only (09XX XXX XXXX)."
+              />
               <div className="space-y-2">
                 <Label>Gender identity</Label>
                 <Select

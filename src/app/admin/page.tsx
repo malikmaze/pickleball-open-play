@@ -208,7 +208,7 @@ export default function AdminPage() {
 
   return (
     <PageShell size="wide">
-      <AppHeader subtitle="Admin dashboard" backHref="/" size="wide" />
+      <AppHeader subtitle="Admin dashboard" size="wide" />
 
       <div className="py-4 sm:py-6">
         <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -217,7 +217,13 @@ export default function AdminPage() {
               Manage Sessions
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Create and manage open play sessions
+              Create and manage open play sessions.{" "}
+              <Link
+                href="/dashboard"
+                className="font-medium text-sisclub-green underline-offset-2 hover:underline"
+              >
+                View guest schedule
+              </Link>
             </p>
           </div>
           <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end">

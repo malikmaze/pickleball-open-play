@@ -25,11 +25,16 @@ const guestNav: NavItem[] = [
   { href: "/live", label: "Live", icon: Radio },
 ];
 
+/** Admin home nav — session tools appear when managing a specific session. */
 const adminListNav: NavItem[] = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/dashboard", label: "Public", icon: CalendarDays },
-  { href: "/live", label: "Live", icon: Radio },
   { label: "Logout", icon: LogOut, action: "logout" },
+];
+
+/** Mobile bottom nav when admin is not inside a session. */
+const adminMobileNav: NavItem[] = [
+  { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/live", label: "Live", icon: Radio },
 ];
 
 function getAdminSessionNav(sessionId: string): NavItem[] {
@@ -64,10 +69,14 @@ function parseSessionId(pathname: string): string | null {
   return match?.[1] ?? null;
 }
 
-export function getNavItems(role: UserRole, pathname = ""): NavItem[] {
+/** App home route — guests see marketing landing; admins go to the dashboard. */
+export function getHomeHref(role: UserRole): string {
+  return role === "admin" ? "/admin" : "/";
+}
+
+export function getNavItems(role: UserRole): NavItem[] {
   if (role !== "admin") return guestNav;
-  const sessionId = parseSessionId(pathname);
-  if (sessionId) return getAdminSessionNav(sessionId);
+  // Session tools live in SessionAdminTabs; top bar stays minimal on all routes.
   return adminListNav;
 }
 
@@ -81,7 +90,7 @@ export function isNavActive(
     if (pathname.startsWith("/admin")) return pathname === "/admin";
     return pathname === "/";
   }
-  if (label === "Sessions" || label === "Public") {
+  if (label === "Sessions") {
     return (
       pathname === "/dashboard" ||
       pathname.startsWith("/session/") ||
@@ -122,10 +131,10 @@ export function getPublicNavItems(
         (i) => i.label !== "Settings"
       );
     }
-    return adminListNav.filter((i) => i.label !== "Logout");
+    return adminMobileNav;
   }
   return [
-    { href: "/", label: "Home", icon: Home },
+    { href: getHomeHref("guest"), label: "Home", icon: Home },
     { href: "/dashboard", label: "Sessions", icon: CalendarDays },
     { href: "/live", label: "Live", icon: Radio },
   ];

@@ -31,7 +31,8 @@ import {
   getEligiblePlayers,
   toQueuePlayer,
 } from "@/lib/queue/queue-engine";
-import { formatSessionDate } from "@/lib/sessions";
+import { FREE_SESSION_PAYMENT_NOTE } from "@/lib/constants";
+import { formatSessionDate, getQueueSessionSettings } from "@/lib/sessions";
 import {
   countAdmittedPlayers,
   getWaitlistedPlayers,
@@ -213,15 +214,11 @@ function SessionAdminContent({ sessionId }: { sessionId: string }) {
   }
 
   const queuePlayers = session.players.map((p) => toQueuePlayer(p));
-  const eligible = getEligiblePlayers(queuePlayers, {
-    paymentRequired: session.paymentRequired,
-    allowUnpaidInQueue: session.allowUnpaidInQueue,
-    skillMatchingMode: session.skillMatchingMode,
-  });
+  const eligible = getEligiblePlayers(queuePlayers, getQueueSessionSettings(session));
 
   return (
     <>
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <div className="mb-2 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <h2 className="font-heading text-xl font-bold text-sisclub-green-dark sm:text-2xl">
             {session.title}
@@ -236,14 +233,14 @@ function SessionAdminContent({ sessionId }: { sessionId: string }) {
             href={`/sessions/${sessionId}/live`}
             className="inline-flex h-9 items-center rounded-full border-2 border-black/10 px-3 text-sm font-medium hover:bg-sisclub-pink-soft"
           >
-            Public live
+            Guest live view
           </Link>
           <Button
             variant="outline"
             onClick={() => load()}
             className="rounded-full border-2 border-black/10"
           >
-          <RefreshCw className="mr-1 h-4 w-4" />
+            <RefreshCw className="mr-1 h-4 w-4" />
             Refresh
           </Button>
         </div>
@@ -289,7 +286,9 @@ function SessionAdminContent({ sessionId }: { sessionId: string }) {
                   {session.paymentNote && <p className="mt-2">{session.paymentNote}</p>}
                 </>
               ) : (
-                <p>No payment required for this session.</p>
+                <p className="rounded-2xl border border-sisclub-green/25 bg-sisclub-green/10 px-3 py-2 font-medium text-sisclub-green-dark">
+                  {FREE_SESSION_PAYMENT_NOTE}
+                </p>
               )}
             </CardContent>
           </Card>

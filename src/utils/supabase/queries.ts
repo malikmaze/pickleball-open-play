@@ -12,7 +12,13 @@ import {
   sortSessions,
   toSessionInsert,
   toSessionUpdate,
+  getQueueSessionSettings,
 } from "@/lib/sessions";
+import {
+  normalizePhilippineMobile,
+  parsePhilippineMobile,
+  PH_MOBILE_ERROR,
+} from "@/lib/phone";
 import {
   createNextMatchForCourt,
   toQueuePlayer,
@@ -412,13 +418,20 @@ export async function registerPlayerRecord(
   const waitlisted = admittedCount >= session.maxPlayers;
   const status: PlayerStatus = waitlisted ? "Waitlisted" : "Registered";
 
+  const contactStored = player.contactNumber?.trim()
+    ? parsePhilippineMobile(player.contactNumber)
+    : null;
+  if (player.contactNumber?.trim() && !contactStored) {
+    throw new Error(PH_MOBILE_ERROR);
+  }
+
   const { data, error } = await supabase
     .from("players")
     .insert({
       session_id: sessionId,
       user_id: player.userId ?? null,
       name: player.name.trim(),
-      contact_number: player.contactNumber?.trim() || null,
+      contact_number: contactStored,
       gender: player.gender ?? null,
       skill_level: player.skillLevel,
       note: player.note?.trim() || null,
@@ -442,21 +455,26 @@ export async function findPlayerByContactInSession(
   sessionId: string,
   contactNumber: string
 ): Promise<string | null> {
-  const normalized = contactNumber.trim();
+  const normalized = parsePhilippineMobile(contactNumber);
   if (!normalized) return null;
 
   const { data, error } = await supabase
     .from("players")
-    .select("id")
+    .select("id, contact_number")
     .eq("session_id", sessionId)
-    .eq("contact_number", normalized)
     .neq("status", "No Show")
-    .order("joined_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .order("joined_at", { ascending: false });
 
   if (error) throw error;
-  return data?.id ?? null;
+  if (!data?.length) return null;
+
+  const match = data.find(
+    (row) =>
+      row.contact_number &&
+      normalizePhilippineMobile(row.contact_number) === normalized
+  );
+
+  return match?.id ?? null;
 }
 
 export async function leaveSessionRecord(
@@ -613,11 +631,7 @@ export async function markPlayersPresentBulk(
 }
 
 function sessionQueueSettings(session: Session): QueueSessionSettings {
-  return {
-    paymentRequired: session.paymentRequired,
-    allowUnpaidInQueue: session.allowUnpaidInQueue,
-    skillMatchingMode: session.skillMatchingMode,
-  };
+  return getQueueSessionSettings(session);
 }
 
 export async function assignNextMatchToCourtRecord(

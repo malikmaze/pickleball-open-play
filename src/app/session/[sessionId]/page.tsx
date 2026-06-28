@@ -4,12 +4,12 @@ import { Suspense, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Loader2, Radio, Search } from "lucide-react";
 import { toast } from "sonner";
+import { ContactNumberInput } from "@/components/contact-number-input";
 import { AppHeader } from "@/components/app-header";
 import { PlayerStatusBadge } from "@/components/player-status-badge";
+import { SessionPaymentBanner } from "@/components/session-payment-banner";
 import { PageShell } from "@/components/page-shell";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Card,
   CardContent,
@@ -27,6 +27,8 @@ import { findPlayerCourt, getGuestStatusHint } from "@/lib/guest-status";
 import { canPlayerWithdrawRegistration } from "@/lib/player-permissions";
 import { getQueuePosition, toQueuePlayer } from "@/lib/queue/queue-engine";
 import { getWaitlistPosition } from "@/lib/waitlist";
+import { getQueueSessionSettings } from "@/lib/sessions";
+import { getPhilippineMobileError } from "@/lib/phone";
 import { createClient } from "@/utils/supabase/client";
 import {
   fetchSessionBundle,
@@ -41,6 +43,9 @@ function SessionStatusContent({ sessionId }: { sessionId: string }) {
   const [leaving, setLeaving] = useState(false);
   const [recoverContact, setRecoverContact] = useState(
     () => getPlayerProfile()?.contactNumber ?? ""
+  );
+  const [recoverContactError, setRecoverContactError] = useState<string | null>(
+    null
   );
   const [recovering, setRecovering] = useState(false);
   const [showRecovery, setShowRecovery] = useState(false);
@@ -67,8 +72,10 @@ function SessionStatusContent({ sessionId }: { sessionId: string }) {
   const handleRecover = async (e: React.FormEvent) => {
     e.preventDefault();
     const contact = recoverContact.trim();
-    if (!contact) {
-      toast.error("Enter the contact number you used when joining");
+    const mobileError = getPhilippineMobileError(contact);
+    if (mobileError) {
+      toast.error(mobileError);
+      setRecoverContactError(mobileError);
       return;
     }
 
@@ -163,11 +170,7 @@ function SessionStatusContent({ sessionId }: { sessionId: string }) {
   const queuePlayers = session.players.map((p) => toQueuePlayer(p));
   const queuePosition =
     myPlayer && myPlayer.status !== "Waitlisted"
-      ? getQueuePosition(queuePlayers, myPlayer.id, {
-          paymentRequired: session.paymentRequired,
-          allowUnpaidInQueue: session.allowUnpaidInQueue,
-          skillMatchingMode: session.skillMatchingMode,
-        })
+      ? getQueuePosition(queuePlayers, myPlayer.id, getQueueSessionSettings(session))
       : null;
   const waitlistPosition = myPlayer
     ? getWaitlistPosition(session.players, myPlayer.id)
@@ -203,18 +206,7 @@ function SessionStatusContent({ sessionId }: { sessionId: string }) {
         <CardContent className="space-y-3 text-sm">
           <p>Courts available: {session.courtCount}</p>
           <p>Scoring: first to {session.targetScore}, win by {session.winBy}</p>
-          {session.paymentRequired ? (
-            <div className="rounded-2xl bg-amber-50 p-3 text-amber-900">
-              <p className="font-semibold">Payment required</p>
-              {session.paymentAmount && <p>Amount: ₱{session.paymentAmount}</p>}
-              {session.paymentNote && <p>{session.paymentNote}</p>}
-              {session.paymentInstructions && (
-                <p className="mt-1">{session.paymentInstructions}</p>
-              )}
-            </div>
-          ) : (
-            <p className="text-muted-foreground">No payment required.</p>
-          )}
+          <SessionPaymentBanner session={session} />
         </CardContent>
       </Card>
 
@@ -311,17 +303,17 @@ function SessionStatusContent({ sessionId }: { sessionId: string }) {
               <CardContent>
                 {showRecovery ? (
                   <form onSubmit={handleRecover} className="space-y-3">
-                    <div className="space-y-2">
-                      <Label htmlFor="recover-contact">Contact number</Label>
-                      <Input
-                        id="recover-contact"
-                        type="tel"
-                        value={recoverContact}
-                        onChange={(e) => setRecoverContact(e.target.value)}
-                        placeholder="09XX XXX XXXX"
-                        className="h-11 rounded-2xl border-2 border-black/10"
-                      />
-                    </div>
+                    <ContactNumberInput
+                      id="recover-contact"
+                      value={recoverContact}
+                      onChange={(value) => {
+                        setRecoverContact(value);
+                        setRecoverContactError(null);
+                      }}
+                      error={recoverContactError}
+                      required
+                      inputClassName="h-11"
+                    />
                     <div className="flex gap-2">
                       <Button
                         type="button"

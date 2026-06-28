@@ -68,3 +68,4 @@ export function PlayerSkillBadge({ level }: { level: PlayerSkillLevel }) {
     </Badge>
   );
 }
+
