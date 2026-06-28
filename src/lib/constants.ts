@@ -57,6 +57,9 @@ export const SKILL_MATCHING_MODES = ["Strict", "Balanced", "Flexible"] as const;
 export const APP_NAME = "Pickleball Open Play";
 export const APP_TAGLINE = "Join games. Track slots. Play more.";
 
+export const MAX_SESSION_PLAYERS = 100;
+export const FREE_SESSION_PAYMENT_NOTE = "Free to join — no payment required.";
+
 export const SKILL_NUMERIC: Record<PlayerSkillLevel, number> = {
   Beginner: 1,
   Novice: 2,

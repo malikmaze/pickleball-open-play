@@ -17,6 +17,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { FreeSessionBadge } from "@/components/free-session-badge";
 import { SkillBadge, StatusBadge } from "@/components/status-badge";
 import { formatSessionDate, isSessionPast } from "@/lib/sessions";
 import { cn } from "@/lib/utils";
@@ -91,24 +92,30 @@ export function SessionCard({
     onLeave(session.id);
   };
 
+  const isFree = !session.paymentRequired;
+
   return (
-    <Card
-      className={cn(
-        "overflow-hidden rounded-3xl border-2 border-black/10 bg-white shadow-md transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg",
-        isJoined && "ring-2 ring-sisclub-green/30"
-      )}
-    >
-      <CardHeader className="space-y-3 pb-3">
-        <div className="flex items-start justify-between gap-2">
-          <CardTitle className="font-heading text-base font-bold text-sisclub-green-dark sm:text-lg">
-            {session.title}
-          </CardTitle>
-          <StatusBadge status={session.status} />
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <SkillBadge level={session.skillLevel} />
-        </div>
-      </CardHeader>
+    <div className="relative">
+      {isFree && <FreeSessionBadge variant="sticker" />}
+      <Card
+        className={cn(
+          "overflow-hidden rounded-3xl border-2 border-black/10 bg-white shadow-md transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg",
+          isJoined && "ring-2 ring-sisclub-green/30"
+        )}
+      >
+        <CardHeader
+          className={cn("space-y-3 pb-3", isFree && "pr-[4.75rem] pt-1")}
+        >
+          <div className="flex items-start justify-between gap-2">
+            <CardTitle className="font-heading text-base font-bold text-sisclub-green-dark sm:text-lg">
+              {session.title}
+            </CardTitle>
+            <StatusBadge status={session.status} />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <SkillBadge level={session.skillLevel} />
+          </div>
+        </CardHeader>
 
       <CardContent className="space-y-2.5 text-sm">
         <div className="flex items-center gap-2 text-foreground/80">
@@ -244,6 +251,7 @@ export function SessionCard({
           </Button>
         )}
       </CardFooter>
-    </Card>
+      </Card>
+    </div>
   );
 }

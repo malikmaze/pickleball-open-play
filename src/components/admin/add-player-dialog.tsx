@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { ContactNumberInput } from "@/components/contact-number-input";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -25,6 +26,7 @@ import {
   PLAYER_SKILL_LEVELS,
   PROFILE_GENDERS,
 } from "@/lib/constants";
+import { getPhilippineMobileError, parsePhilippineMobile } from "@/lib/phone";
 import { createClient } from "@/utils/supabase/client";
 import { registerPlayerRecord } from "@/utils/supabase/queries";
 import type { PlayerSkillLevel, ProfileGender } from "@/types";
@@ -47,6 +49,7 @@ export function AddPlayerDialog({
   const [gender, setGender] = useState<ProfileGender>(DEFAULT_PROFILE_GENDER);
   const [skillLevel, setSkillLevel] = useState<PlayerSkillLevel>("Novice");
   const [note, setNote] = useState("");
+  const [contactError, setContactError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   const reset = () => {
@@ -63,13 +66,24 @@ export function AddPlayerDialog({
       toast.error("Name is required");
       return;
     }
+    if (contactNumber.trim()) {
+      const mobileError = getPhilippineMobileError(contactNumber);
+      if (mobileError) {
+        toast.error(mobileError);
+        setContactError(mobileError);
+        return;
+      }
+    }
 
     setSaving(true);
     try {
       const supabase = createClient();
+      const normalizedContact = contactNumber.trim()
+        ? parsePhilippineMobile(contactNumber)!
+        : undefined;
       const { waitlisted } = await registerPlayerRecord(supabase, sessionId, {
         name: name.trim(),
-        contactNumber: contactNumber.trim() || undefined,
+        contactNumber: normalizedContact,
         gender,
         skillLevel,
         note: note.trim() || undefined,
@@ -118,16 +132,18 @@ export function AddPlayerDialog({
               required
             />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="walkin-contact">Contact</Label>
-            <Input
-              id="walkin-contact"
-              type="tel"
-              value={contactNumber}
-              onChange={(e) => setContactNumber(e.target.value)}
-              className="rounded-2xl border-2 border-black/10"
-            />
-          </div>
+          <ContactNumberInput
+            id="walkin-contact"
+            label="Contact"
+            value={contactNumber}
+            onChange={(value) => {
+              setContactNumber(value);
+              setContactError(null);
+            }}
+            error={contactError}
+            hint="Optional. Philippine mobile only (09XX XXX XXXX)."
+            inputClassName="rounded-2xl border-2 border-black/10"
+          />
           <div className="space-y-2">
             <Label>Gender</Label>
             <Select

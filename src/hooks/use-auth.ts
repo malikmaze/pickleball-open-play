@@ -61,7 +61,7 @@ export function useAuth() {
     await supabase.auth.signOut();
     setUser(null);
     setRole("guest");
-    router.push("/dashboard");
+    router.push("/");
     router.refresh();
   }, [router]);
 

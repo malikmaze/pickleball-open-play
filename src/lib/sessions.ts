@@ -289,3 +289,18 @@ export function defaultSessionFields(): Pick<
     skillMatchingMode: "Balanced",
   };
 }
+
+/** Queue payment flags — free sessions always allow unpaid players in queue. */
+export function getQueueSessionSettings(session: {
+  paymentRequired: boolean;
+  allowUnpaidInQueue: boolean;
+  skillMatchingMode: Session["skillMatchingMode"];
+}) {
+  return {
+    paymentRequired: session.paymentRequired,
+    allowUnpaidInQueue: session.paymentRequired
+      ? session.allowUnpaidInQueue
+      : true,
+    skillMatchingMode: session.skillMatchingMode,
+  };
+}

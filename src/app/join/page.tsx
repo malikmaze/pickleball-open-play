@@ -6,6 +6,9 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { CalendarDays, Loader2, MapPin } from "lucide-react";
 import { AppHeader } from "@/components/app-header";
+import { ContactNumberInput } from "@/components/contact-number-input";
+import { SessionPaymentBanner } from "@/components/session-payment-banner";
+import { FreeSessionBadge } from "@/components/free-session-badge";
 import { PageShell } from "@/components/page-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,6 +35,8 @@ import {
 import { getPlayerProfile } from "@/lib/player-profile";
 import { PLAYER_SKILL_LEVELS, PROFILE_GENDERS, normalizeProfileGender } from "@/lib/constants";
 import { formatSessionDate } from "@/lib/sessions";
+import { cn } from "@/lib/utils";
+import { getPhilippineMobileError, parsePhilippineMobile } from "@/lib/phone";
 import { createClient } from "@/utils/supabase/client";
 import {
   fetchSessionById,
@@ -71,6 +76,7 @@ function JoinForm() {
     () => getPlayerProfile()?.skillLevel ?? "Novice"
   );
   const [note, setNote] = useState("");
+  const [contactError, setContactError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -106,8 +112,16 @@ function JoinForm() {
     }
     if (!contactNumber.trim()) {
       toast.error("Please enter your contact number");
+      setContactError("Please enter your contact number");
       return;
     }
+    const mobileError = getPhilippineMobileError(contactNumber);
+    if (mobileError) {
+      toast.error(mobileError);
+      setContactError(mobileError);
+      return;
+    }
+    const normalizedContact = parsePhilippineMobile(contactNumber)!;
 
     try {
       const supabase = createClient();
@@ -142,14 +156,14 @@ function JoinForm() {
     setIsSubmitting(true);
 
     try {
-      saveProfile({ name, contactNumber, gender, skillLevel });
+      saveProfile({ name, contactNumber: normalizedContact, gender, skillLevel });
       const supabase = createClient();
       const { playerId, waitlisted } = await registerPlayerRecord(
         supabase,
         sessionId,
         {
           name: name.trim(),
-          contactNumber: contactNumber.trim(),
+          contactNumber: normalizedContact,
           gender,
           skillLevel,
           note,
@@ -186,11 +200,20 @@ function JoinForm() {
             <Loader2 className="h-8 w-8 animate-spin text-sisclub-green" />
           </div>
         ) : session ? (
-          <Card className="rounded-3xl border-2 border-sisclub-green/20 bg-gradient-to-b from-white to-sisclub-green/5">
-            <CardHeader className="pb-2">
-              <CardTitle className="font-heading text-lg text-sisclub-green-dark">
-                {session.title}
-              </CardTitle>
+          <div className="relative">
+            {!session.paymentRequired && (
+              <FreeSessionBadge variant="sticker" />
+            )}
+            <Card className="rounded-3xl border-2 border-sisclub-green/20 bg-gradient-to-b from-white to-sisclub-green/5">
+              <CardHeader
+                className={cn(
+                  "pb-2",
+                  !session.paymentRequired && "pr-[4.75rem] pt-1"
+                )}
+              >
+                <CardTitle className="font-heading text-lg text-sisclub-green-dark">
+                  {session.title}
+                </CardTitle>
               <CardDescription className="space-y-1">
                 <span className="flex items-center gap-1.5">
                   <CalendarDays className="h-3.5 w-3.5" />
@@ -204,6 +227,7 @@ function JoinForm() {
               </CardDescription>
             </CardHeader>
           </Card>
+          </div>
         ) : (
           <div className="rounded-3xl border-2 border-destructive/30 bg-destructive/5 px-6 py-8 text-center text-sm text-destructive">
             Session not found.{" "}
@@ -242,17 +266,9 @@ function JoinForm() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {session?.paymentRequired && (
-                <div className="mb-5 rounded-2xl bg-amber-50 p-4 text-sm text-amber-900">
-                  <p className="font-semibold">Payment required for this session</p>
-                  {session.paymentAmount && <p>Amount: ₱{session.paymentAmount}</p>}
-                  {session.paymentNote && <p>{session.paymentNote}</p>}
-                  {session.paymentInstructions && (
-                    <p className="mt-1">{session.paymentInstructions}</p>
-                  )}
-                  <p className="mt-2 text-xs">
-                    The admin will mark you as Secured after payment is confirmed.
-                  </p>
+              {session && (
+                <div className="mb-5">
+                  <SessionPaymentBanner session={session} joinForm />
                 </div>
               )}
               <form onSubmit={handleSubmit} className="space-y-5">
@@ -268,22 +284,17 @@ function JoinForm() {
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="contact">Contact number *</Label>
-                  <Input
-                    id="contact"
-                    type="tel"
-                    placeholder="09XX XXX XXXX"
-                    value={contactNumber}
-                    onChange={(e) => setContactNumber(e.target.value)}
-                    className="h-12 rounded-2xl border-2 border-black/10"
-                    required
-                    disabled={!session}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Used to find your registration if you return on another device.
-                  </p>
-                </div>
+                <ContactNumberInput
+                  value={contactNumber}
+                  onChange={(value) => {
+                    setContactNumber(value);
+                    setContactError(null);
+                  }}
+                  error={contactError}
+                  hint="Used to find your registration if you return on another device. Philippine mobile only (09XX XXX XXXX)."
+                  required
+                  disabled={!session}
+                />
 
                 <div className="space-y-2">
                   <Label>Gender identity *</Label>

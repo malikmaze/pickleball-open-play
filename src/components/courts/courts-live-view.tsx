@@ -16,6 +16,7 @@ import {
   toQueuePlayer,
   validateMatchScore,
 } from "@/lib/queue/queue-engine";
+import { getQueueSessionSettings } from "@/lib/sessions";
 import { createClient } from "@/utils/supabase/client";
 import {
   changeCourtSidesRecord,
@@ -31,11 +32,7 @@ import {
 import type { Court, Match, SessionBundle } from "@/types";
 
 function queueSettings(session: SessionBundle["session"]) {
-  return {
-    paymentRequired: session.paymentRequired,
-    allowUnpaidInQueue: session.allowUnpaidInQueue,
-    skillMatchingMode: session.skillMatchingMode,
-  };
+  return getQueueSessionSettings(session);
 }
 
 export function CourtsLiveView({
