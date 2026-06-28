@@ -41,6 +41,10 @@ import {
   sessionToFormValues,
 } from "@/components/admin/session-form";
 import { defaultSessionFields, formatSessionDate } from "@/lib/sessions";
+import {
+  countAdmittedPlayers,
+  getWaitlistedPlayers,
+} from "@/lib/waitlist";
 import { seedSamplePlaySession } from "@/lib/sample-play";
 import { createClient } from "@/utils/supabase/client";
 import {
@@ -49,12 +53,21 @@ import {
   deleteSessionRecord,
   toggleSessionClosedRecord,
   updateSessionRecord,
+  type SessionListScope,
 } from "@/utils/supabase/queries";
 import type { Session } from "@/types";
+import { cn } from "@/lib/utils";
+
+const FILTER_OPTIONS: { id: SessionListScope; label: string }[] = [
+  { id: "today", label: "Today" },
+  { id: "upcoming", label: "Upcoming" },
+  { id: "all", label: "All" },
+];
 
 export default function AdminPage() {
   const router = useRouter();
-  const { sessions, isLoading, error, refetch } = useSessions("all");
+  const [listScope, setListScope] = useState<SessionListScope>("upcoming");
+  const { sessions, isLoading, error, refetch } = useSessions(listScope);
   const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(emptySessionForm());
@@ -204,7 +217,7 @@ export default function AdminPage() {
               Manage Sessions
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              All scheduled open play sessions
+              Create and manage open play sessions
             </p>
           </div>
           <div className="flex gap-2">
@@ -237,6 +250,24 @@ export default function AdminPage() {
               <LogOut className="h-4 w-4" />
             </Button>
           </div>
+        </div>
+
+        <div className="mb-6 flex flex-wrap gap-2">
+          {FILTER_OPTIONS.map((opt) => (
+            <Button
+              key={opt.id}
+              type="button"
+              variant={listScope === opt.id ? "default" : "outline"}
+              onClick={() => setListScope(opt.id)}
+              className={cn(
+                "rounded-full border-2 border-black/10",
+                listScope === opt.id &&
+                  "bg-sisclub-green font-semibold text-white hover:bg-sisclub-green-dark"
+              )}
+            >
+              {opt.label}
+            </Button>
+          ))}
         </div>
 
         {isLoading ? (
@@ -306,9 +337,10 @@ export default function AdminPage() {
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <p className="text-sm text-muted-foreground">
-                    {session.players.length} / {session.maxPlayers} players
-                    {session.players.length > 0 &&
-                      ` · ${session.players.map((p) => p.name).join(", ")}`}
+                    {countAdmittedPlayers(session.players)} /{" "}
+                    {session.maxPlayers} joined
+                    {getWaitlistedPlayers(session.players).length > 0 &&
+                      ` · ${getWaitlistedPlayers(session.players).length} waitlisted`}
                   </p>
 
                   <div className="flex flex-wrap gap-2">

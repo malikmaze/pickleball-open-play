@@ -230,8 +230,17 @@ export function CourtsLiveView({
       toast.success(`Court ${court.courtNumber} winner: Team ${result.winner}`);
       setTimeout(async () => {
         const supabase = createClient();
-        await resetCourtAfterMatch(supabase, court.id);
+        const autoMatch = await resetCourtAfterMatch(
+          supabase,
+          court.id,
+          session
+        );
         setWinnerFlash((prev) => ({ ...prev, [court.id]: null }));
+        if (autoMatch) {
+          toast.success(
+            `Next match auto-assigned on Court ${court.courtNumber}`
+          );
+        }
         await load();
       }, 3000);
     } catch (err) {
@@ -277,15 +286,22 @@ export function CourtsLiveView({
             match.teamBPlayer2Id,
           ]
         : undefined;
-      await clearCourtRecord(
+      const autoMatch = await clearCourtRecord(
         supabase,
         court.id,
         sessionId,
         court.courtNumber,
         match?.id,
-        playerIds
+        playerIds,
+        session ?? undefined
       );
-      toast.success(`Court ${court.courtNumber} cleared`);
+      if (autoMatch) {
+        toast.success(
+          `Court ${court.courtNumber} cleared · next match assigned`
+        );
+      } else {
+        toast.success(`Court ${court.courtNumber} cleared`);
+      }
       await load();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Clear failed");

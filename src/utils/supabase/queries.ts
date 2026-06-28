@@ -14,6 +14,11 @@ import {
   toSessionUpdate,
 } from "@/lib/sessions";
 import {
+  createNextMatchForCourt,
+  toQueuePlayer,
+  type QueueSessionSettings,
+} from "@/lib/queue/queue-engine";
+import {
   countAdmittedPlayers,
   getAvailableSpots,
   getWaitlistedPlayers,
@@ -540,12 +545,92 @@ export async function markPlayerSecured(
 
 export async function markPlayerNoShow(
   supabase: Client,
-  playerId: string
+  playerId: string,
+  sessionId?: string
 ): Promise<void> {
+  const { data: player } = await supabase
+    .from("players")
+    .select("session_id")
+    .eq("id", playerId)
+    .single();
+
   await updatePlayerRecord(supabase, playerId, {
     status: "No Show",
     isActive: false,
   });
+
+  const sid = sessionId ?? player?.session_id;
+  if (sid) {
+    await processWaitlistPromotions(supabase, sid);
+  }
+}
+
+export async function markPlayersPresentBulk(
+  supabase: Client,
+  sessionId: string,
+  playerIds: string[]
+): Promise<number> {
+  let count = 0;
+  for (const playerId of playerIds) {
+    const { data: player } = await supabase
+      .from("players")
+      .select("status")
+      .eq("id", playerId)
+      .eq("session_id", sessionId)
+      .single();
+    if (
+      !player ||
+      !["Registered", "Secured"].includes(player.status)
+    ) {
+      continue;
+    }
+    await markPlayerPresent(supabase, playerId, sessionId);
+    count += 1;
+  }
+  return count;
+}
+
+function sessionQueueSettings(session: Session): QueueSessionSettings {
+  return {
+    paymentRequired: session.paymentRequired,
+    allowUnpaidInQueue: session.allowUnpaidInQueue,
+    skillMatchingMode: session.skillMatchingMode,
+  };
+}
+
+export async function assignNextMatchToCourtRecord(
+  supabase: Client,
+  session: Session,
+  courtId: string
+): Promise<Match | null> {
+  const assignment = createNextMatchForCourt(
+    session.players.map((p) => toQueuePlayer(p)),
+    sessionQueueSettings(session)
+  );
+  if (!assignment) return null;
+
+  const [a1, a2] = assignment.teams.teamA;
+  const [b1, b2] = assignment.teams.teamB;
+  return createMatchRecord(supabase, {
+    sessionId: session.id,
+    courtId,
+    teamAPlayer1Id: a1.id,
+    teamAPlayer2Id: a2.id,
+    teamBPlayer1Id: b1.id,
+    teamBPlayer2Id: b2.id,
+  });
+}
+
+export async function resetCourtAfterMatch(
+  supabase: Client,
+  courtId: string,
+  session?: Session
+): Promise<Match | null> {
+  await updateCourtStatus(supabase, courtId, "Empty");
+  if (session?.autoAssignNextMatch) {
+    return assignNextMatchToCourtRecord(supabase, session, courtId);
+  }
+  return null;
 }
 
 export async function updateCourtStatus(
@@ -751,13 +836,6 @@ export async function finishMatchRecord(
   }
 }
 
-export async function resetCourtAfterMatch(
-  supabase: Client,
-  courtId: string
-): Promise<void> {
-  await updateCourtStatus(supabase, courtId, "Empty");
-}
-
 export async function getActiveMatchForCourt(
   supabase: Client,
   courtId: string
@@ -865,8 +943,9 @@ export async function clearCourtRecord(
   sessionId: string,
   courtNumber: number,
   matchId?: string,
-  playerIds?: string[]
-): Promise<void> {
+  playerIds?: string[],
+  session?: Session
+): Promise<Match | null> {
   if (matchId) {
     await supabase.from("matches").delete().eq("id", matchId);
   }
@@ -891,6 +970,11 @@ export async function clearCourtRecord(
     `Court ${courtNumber} Cleared`,
     ""
   );
+
+  if (session?.autoAssignNextMatch) {
+    return assignNextMatchToCourtRecord(supabase, session, courtId);
+  }
+  return null;
 }
 
 export async function addTestPlayersToSession(

@@ -1,15 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { getNavItems, isNavActive } from "@/lib/nav-items";
 import { useAuth } from "@/hooks/use-auth";
 
 export function DesktopNav() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const activeTab = searchParams.get("tab");
   const { role, loading, signOut } = useAuth();
-  const items = getNavItems(loading ? "guest" : role);
+  const items = getNavItems(loading ? "guest" : role, pathname);
 
   return (
     <nav className="hidden border-b-2 border-black/10 bg-white/90 backdrop-blur-md md:block">
@@ -32,7 +34,7 @@ export function DesktopNav() {
           }
 
           const href = item.href!;
-          const active = isNavActive(pathname, href, item.label);
+          const active = isNavActive(pathname, href, item.label, activeTab);
 
           return (
             <Link

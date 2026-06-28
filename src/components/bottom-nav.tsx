@@ -1,16 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { getPublicNavItems, isNavActive } from "@/lib/nav-items";
 import { useAuth } from "@/hooks/use-auth";
 
 export function BottomNav() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const activeTab = searchParams.get("tab");
   const router = useRouter();
   const { role, loading, signOut } = useAuth();
-  const items = getPublicNavItems(loading ? "guest" : role);
+  const items = getPublicNavItems(loading ? "guest" : role, pathname);
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-50 border-t-2 border-black/10 bg-white/95 backdrop-blur-md md:hidden">
@@ -33,7 +35,7 @@ export function BottomNav() {
           }
 
           const href = item.href!;
-          const active = isNavActive(pathname, href, item.label);
+          const active = isNavActive(pathname, href, item.label, activeTab);
 
           return (
             <Link
