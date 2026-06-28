@@ -1,29 +1,43 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   defaultSessionFields,
+  computeSessionStatus,
   getTodayDate,
   mapActivity,
+  mapActivityLog,
   mapCourt,
   mapMatch,
+  mapProfile,
   mapSession,
   sortSessions,
   toSessionInsert,
   toSessionUpdate,
 } from "@/lib/sessions";
+import {
+  countAdmittedPlayers,
+  getAvailableSpots,
+  getWaitlistedPlayers,
+} from "@/lib/waitlist";
 import type { Database } from "@/utils/supabase/database.types";
+import type { Json } from "@/utils/supabase/database.types";
 import type {
+  ActivityEventType,
   Court,
   Match,
   PlayerSkillLevel,
   PlayerStatus,
+  ProfileGender,
   Session,
   SessionActivity,
   SessionBundle,
   SessionSkillLevel,
+  UserProfile,
   WinnerTeam,
 } from "@/types";
 
 type Client = SupabaseClient<Database>;
+
+export type SessionListScope = "today" | "upcoming" | "all";
 
 async function fetchPlayersForSessions(
   supabase: Client,
@@ -38,21 +52,15 @@ async function fetchPlayersForSessions(
   return data ?? [];
 }
 
-export async function fetchTodaySessions(
-  supabase: Client
+async function mapSessionRows(
+  supabase: Client,
+  rows: Database["public"]["Tables"]["sessions"]["Row"][]
 ): Promise<Session[]> {
-  const today = getTodayDate();
-  const { data: sessions, error } = await supabase
-    .from("sessions")
-    .select("*")
-    .eq("date", today)
-    .order("start_time", { ascending: true });
-  if (error) throw error;
-  if (!sessions?.length) return [];
+  if (!rows.length) return [];
 
   const players = await fetchPlayersForSessions(
     supabase,
-    sessions.map((s) => s.id)
+    rows.map((s) => s.id)
   );
   const playersBySession = new Map<string, typeof players>();
   for (const player of players) {
@@ -62,10 +70,48 @@ export async function fetchTodaySessions(
   }
 
   return sortSessions(
-    sessions.map((row) =>
-      mapSession(row, playersBySession.get(row.id) ?? [])
-    )
+    rows.map((row) => mapSession(row, playersBySession.get(row.id) ?? []))
   );
+}
+
+export async function fetchSessions(
+  supabase: Client,
+  scope: SessionListScope = "today"
+): Promise<Session[]> {
+  const today = getTodayDate();
+  let query = supabase.from("sessions").select("*");
+
+  if (scope === "today") {
+    query = query.eq("date", today);
+  } else if (scope === "upcoming") {
+    query = query.gte("date", today);
+  }
+
+  const { data: sessions, error } = await query
+    .order("date", { ascending: true })
+    .order("start_time", { ascending: true });
+  if (error) throw error;
+  if (!sessions?.length) return [];
+
+  return mapSessionRows(supabase, sessions);
+}
+
+export async function fetchTodaySessions(
+  supabase: Client
+): Promise<Session[]> {
+  return fetchSessions(supabase, "today");
+}
+
+export async function fetchUpcomingSessions(
+  supabase: Client
+): Promise<Session[]> {
+  return fetchSessions(supabase, "upcoming");
+}
+
+export async function fetchAllSessions(
+  supabase: Client
+): Promise<Session[]> {
+  return fetchSessions(supabase, "all");
 }
 
 export async function fetchSessionById(
@@ -119,11 +165,20 @@ export async function fetchSessionBundle(
     .limit(50);
   if (activityError) throw activityError;
 
+  const { data: activityLogs, error: logsError } = await supabase
+    .from("activity_logs")
+    .select("*")
+    .eq("session_id", sessionId)
+    .order("created_at", { ascending: false })
+    .limit(20);
+  if (logsError) throw logsError;
+
   return {
     session,
     courts: (courts ?? []).map(mapCourt),
     matches: (matches ?? []).map(mapMatch),
     activity: (activity ?? []).map(mapActivity),
+    activityLogs: (activityLogs ?? []).map(mapActivityLog),
   };
 }
 
@@ -204,6 +259,9 @@ export async function updateSessionRecord(
   if (updates.courtCount !== undefined) {
     await syncCourtsForSession(supabase, sessionId, updates.courtCount);
   }
+  if (updates.maxPlayers !== undefined) {
+    await processWaitlistPromotions(supabase, sessionId);
+  }
 }
 
 export async function deleteSessionRecord(
@@ -246,42 +304,129 @@ export async function clearSessionPlayersRecord(
     .eq("id", sessionId);
 }
 
+export async function syncSessionCapacityRecord(
+  supabase: Client,
+  sessionId: string
+): Promise<void> {
+  const session = await fetchSessionById(supabase, sessionId);
+  if (!session || session.status === "closed") return;
+
+  const admittedCount = countAdmittedPlayers(session.players);
+  const dbStatus = computeSessionStatus(
+    "open",
+    admittedCount,
+    session.maxPlayers
+  );
+
+  await supabase
+    .from("sessions")
+    .update({ status: dbStatus })
+    .eq("id", sessionId);
+}
+
+export async function processWaitlistPromotions(
+  supabase: Client,
+  sessionId: string
+): Promise<number> {
+  const session = await fetchSessionById(supabase, sessionId);
+  if (!session || session.status === "closed") return 0;
+
+  let spots = getAvailableSpots(
+    countAdmittedPlayers(session.players),
+    session.maxPlayers
+  );
+  if (spots <= 0) {
+    await syncSessionCapacityRecord(supabase, sessionId);
+    return 0;
+  }
+
+  const waitlisted = getWaitlistedPlayers(session.players);
+  let promoted = 0;
+
+  for (const player of waitlisted) {
+    if (spots <= 0) break;
+    const { error } = await supabase
+      .from("players")
+      .update({ status: "Registered" })
+      .eq("id", player.id)
+      .eq("status", "Waitlisted");
+    if (error) throw error;
+    spots -= 1;
+    promoted += 1;
+  }
+
+  await syncSessionCapacityRecord(supabase, sessionId);
+  return promoted;
+}
+
+export async function admitWaitlistedPlayerRecord(
+  supabase: Client,
+  sessionId: string,
+  playerId: string
+): Promise<void> {
+  const session = await fetchSessionById(supabase, sessionId);
+  if (!session) throw new Error("Session not found");
+
+  const player = session.players.find((p) => p.id === playerId);
+  if (!player || player.status !== "Waitlisted") {
+    throw new Error("Player is not on the waitlist");
+  }
+
+  const admittedCount = countAdmittedPlayers(session.players);
+  if (admittedCount >= session.maxPlayers) {
+    throw new Error("Session is at capacity");
+  }
+
+  const { error } = await supabase
+    .from("players")
+    .update({ status: "Registered" })
+    .eq("id", playerId)
+    .eq("status", "Waitlisted");
+  if (error) throw error;
+
+  await syncSessionCapacityRecord(supabase, sessionId);
+}
+
 export async function registerPlayerRecord(
   supabase: Client,
   sessionId: string,
   player: {
+    userId?: string;
     name: string;
     contactNumber?: string;
+    gender?: ProfileGender;
     skillLevel: PlayerSkillLevel;
     note?: string;
   }
-): Promise<string> {
+): Promise<{ playerId: string; waitlisted: boolean }> {
+  const session = await fetchSessionById(supabase, sessionId);
+  if (!session) throw new Error("Session not found");
+  if (session.status === "closed") throw new Error("This session is closed");
+
+  const admittedCount = countAdmittedPlayers(session.players);
+  const waitlisted = admittedCount >= session.maxPlayers;
+  const status: PlayerStatus = waitlisted ? "Waitlisted" : "Registered";
+
   const { data, error } = await supabase
     .from("players")
     .insert({
       session_id: sessionId,
+      user_id: player.userId ?? null,
       name: player.name.trim(),
       contact_number: player.contactNumber?.trim() || null,
+      gender: player.gender ?? null,
       skill_level: player.skillLevel,
       note: player.note?.trim() || null,
-      status: "Registered",
+      status,
     })
     .select("id")
     .single();
-  if (error) throw error;
-
-  const session = await fetchSessionById(supabase, sessionId);
-  if (
-    session &&
-    session.players.length >= session.maxPlayers &&
-    session.status !== "closed"
-  ) {
-    await supabase
-      .from("sessions")
-      .update({ status: "full" })
-      .eq("id", sessionId);
+  if (error) {
+    throw new Error(error.message);
   }
-  return data.id;
+
+  await syncSessionCapacityRecord(supabase, sessionId);
+  return { playerId: data.id, waitlisted };
 }
 
 /** @deprecated Use registerPlayerRecord */
@@ -293,17 +438,7 @@ export async function leaveSessionRecord(
   sessionId: string
 ): Promise<void> {
   await deletePlayerRecord(supabase, playerId);
-  const session = await fetchSessionById(supabase, sessionId);
-  if (
-    session &&
-    session.status === "full" &&
-    session.players.length < session.maxPlayers
-  ) {
-    await supabase
-      .from("sessions")
-      .update({ status: "open" })
-      .eq("id", sessionId);
-  }
+  await processWaitlistPromotions(supabase, sessionId);
 }
 
 export async function deletePlayerRecord(
@@ -351,22 +486,56 @@ export async function updatePlayerRecord(
 
 export async function markPlayerPresent(
   supabase: Client,
-  playerId: string
+  playerId: string,
+  sessionId?: string
 ): Promise<void> {
+  const { data: player } = await supabase
+    .from("players")
+    .select("name, session_id")
+    .eq("id", playerId)
+    .single();
+
   await updatePlayerRecord(supabase, playerId, {
     status: "Present",
     checkedInAt: new Date().toISOString(),
   });
+
+  if (player) {
+    await logActivity(
+      supabase,
+      sessionId ?? player.session_id,
+      "check_in",
+      player.name,
+      "Checked In"
+    );
+  }
 }
 
 export async function markPlayerSecured(
   supabase: Client,
-  playerId: string
+  playerId: string,
+  sessionId?: string
 ): Promise<void> {
+  const { data: player } = await supabase
+    .from("players")
+    .select("name, session_id")
+    .eq("id", playerId)
+    .single();
+
   await updatePlayerRecord(supabase, playerId, {
     status: "Secured",
     securedAt: new Date().toISOString(),
   });
+
+  if (player) {
+    await logActivity(
+      supabase,
+      sessionId ?? player.session_id,
+      "payment_confirmed",
+      player.name,
+      "Payment Confirmed"
+    );
+  }
 }
 
 export async function markPlayerNoShow(
@@ -429,14 +598,43 @@ export async function createMatchRecord(
   if (error) throw error;
 
   await updateCourtStatus(supabase, input.courtId, "Ready");
+
+  const { data: court } = await supabase
+    .from("courts")
+    .select("court_number")
+    .eq("id", input.courtId)
+    .single();
+
+  const { data: players } = await supabase
+    .from("players")
+    .select("name")
+    .in("id", playerIds);
+
+  const names = (players ?? []).map((p) => p.name);
+  await logActivity(
+    supabase,
+    input.sessionId,
+    "now_calling",
+    `Court ${court?.court_number ?? "?"}`,
+    names.join("\n"),
+    { courtId: input.courtId, playerIds }
+  );
+
   return mapMatch(data);
 }
 
 export async function startMatchRecord(
   supabase: Client,
   matchId: string,
-  courtId: string
+  courtId: string,
+  sessionId?: string
 ): Promise<void> {
+  const { data: court } = await supabase
+    .from("courts")
+    .select("court_number, session_id")
+    .eq("id", courtId)
+    .single();
+
   const { error } = await supabase
     .from("matches")
     .update({
@@ -446,6 +644,16 @@ export async function startMatchRecord(
     .eq("id", matchId);
   if (error) throw error;
   await updateCourtStatus(supabase, courtId, "Playing");
+
+  if (court) {
+    await logActivity(
+      supabase,
+      sessionId ?? court.session_id,
+      "match_started",
+      `Court ${court.court_number} Match Started`,
+      ""
+    );
+  }
 }
 
 export async function finishMatchRecord(
@@ -458,6 +666,19 @@ export async function finishMatchRecord(
   playerIds: string[]
 ): Promise<void> {
   const now = new Date().toISOString();
+
+  const { data: match } = await supabase
+    .from("matches")
+    .select("*")
+    .eq("id", matchId)
+    .single();
+
+  const { data: court } = await supabase
+    .from("courts")
+    .select("court_number, session_id")
+    .eq("id", courtId)
+    .single();
+
   const { error } = await supabase
     .from("matches")
     .update({
@@ -484,6 +705,50 @@ export async function finishMatchRecord(
   }
 
   await updateCourtStatus(supabase, courtId, "Finished");
+
+  if (match && court) {
+    const ids = [
+      match.team_a_player_1,
+      match.team_a_player_2,
+      match.team_b_player_1,
+      match.team_b_player_2,
+    ].filter(Boolean) as string[];
+
+    const { data: players } = await supabase
+      .from("players")
+      .select("id, name")
+      .in("id", ids);
+
+    const nameMap = new Map((players ?? []).map((p) => [p.id, p.name]));
+    const teamA = [match.team_a_player_1, match.team_a_player_2]
+      .map((id) => (id ? nameMap.get(id) : null))
+      .filter(Boolean)
+      .join(" & ");
+    const teamB = [match.team_b_player_1, match.team_b_player_2]
+      .map((id) => (id ? nameMap.get(id) : null))
+      .filter(Boolean)
+      .join(" & ");
+    const winners = winnerTeam === "A" ? teamA : teamB;
+    const losers = winnerTeam === "A" ? teamB : teamA;
+    const score = `${teamAScore}–${teamBScore}`;
+
+    await logActivity(
+      supabase,
+      court.session_id,
+      "match_finished",
+      `Court ${court.court_number} Winner`,
+      `${winners}\ndef.\n${losers}\n${score}`,
+      {
+        courtId,
+        matchId,
+        winnerTeam,
+        teamAScore,
+        teamBScore,
+        winners,
+        losers,
+      }
+    );
+  }
 }
 
 export async function resetCourtAfterMatch(
@@ -544,6 +809,29 @@ export async function logSessionActivity(
   return mapActivity(data);
 }
 
+export async function logActivity(
+  supabase: Client,
+  sessionId: string,
+  eventType: ActivityEventType,
+  title: string,
+  description: string,
+  metadata?: Record<string, unknown>
+) {
+  const { data, error } = await supabase
+    .from("activity_logs")
+    .insert({
+      session_id: sessionId,
+      event_type: eventType,
+      title,
+      description,
+      metadata: (metadata ?? {}) as Json,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return mapActivityLog(data);
+}
+
 export async function changeCourtSidesRecord(
   supabase: Client,
   court: Court,
@@ -561,11 +849,12 @@ export async function changeCourtSidesRecord(
     .select()
     .single();
   if (error) throw error;
-  await logSessionActivity(
+  await logActivity(
     supabase,
     sessionId,
-    `Court ${court.courtNumber} changed sides`,
-    court.id
+    "side_change",
+    `Court ${court.courtNumber} Side Change`,
+    ""
   );
   return mapCourt(data);
 }
@@ -595,11 +884,12 @@ export async function clearCourtRecord(
       last_side_change_at: null,
     })
     .eq("id", courtId);
-  await logSessionActivity(
+  await logActivity(
     supabase,
     sessionId,
-    `Court ${courtNumber} cleared`,
-    courtId
+    "court_cleared",
+    `Court ${courtNumber} Cleared`,
+    ""
   );
 }
 
@@ -621,6 +911,89 @@ export async function fetchTestPlayerTemplates(supabase: Client) {
     .order("sort_order", { ascending: true });
   if (error) throw error;
   return data ?? [];
+}
+
+export async function fetchProfileByUserId(
+  supabase: Client,
+  userId: string
+): Promise<UserProfile | null> {
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("id", userId)
+    .maybeSingle();
+  if (error) throw error;
+  return data ? mapProfile(data) : null;
+}
+
+export async function createProfileRecord(
+  supabase: Client,
+  profile: {
+    id: string;
+    email: string;
+    fullName: string;
+    contactNumber?: string;
+    gender: ProfileGender;
+    skillLevel: PlayerSkillLevel;
+  }
+): Promise<UserProfile> {
+  const { data, error } = await supabase
+    .from("profiles")
+    .insert({
+      id: profile.id,
+      email: profile.email,
+      full_name: profile.fullName.trim(),
+      contact_number: profile.contactNumber?.trim() || null,
+      gender: profile.gender,
+      skill_level: profile.skillLevel,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return mapProfile(data);
+}
+
+export async function updateProfileRecord(
+  supabase: Client,
+  userId: string,
+  updates: {
+    fullName?: string;
+    contactNumber?: string;
+    gender?: ProfileGender;
+    skillLevel?: PlayerSkillLevel;
+  }
+): Promise<void> {
+  const payload: Database["public"]["Tables"]["profiles"]["Update"] = {};
+  if (updates.fullName !== undefined) payload.full_name = updates.fullName.trim();
+  if (updates.contactNumber !== undefined)
+    payload.contact_number = updates.contactNumber.trim() || null;
+  if (updates.gender !== undefined) payload.gender = updates.gender;
+  if (updates.skillLevel !== undefined) payload.skill_level = updates.skillLevel;
+
+  const { error } = await supabase
+    .from("profiles")
+    .update(payload)
+    .eq("id", userId);
+  if (error) throw error;
+}
+
+export async function fetchMyRegistrations(
+  supabase: Client,
+  userId: string
+) {
+  const { data, error } = await supabase
+    .from("players")
+    .select("*, sessions(*)")
+    .eq("user_id", userId)
+    .order("joined_at", { ascending: false });
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function checkIsAdmin(supabase: Client): Promise<boolean> {
+  const { data, error } = await supabase.rpc("is_admin");
+  if (error) return false;
+  return data === true;
 }
 
 export type { SessionSkillLevel };

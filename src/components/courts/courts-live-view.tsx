@@ -4,12 +4,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Loader2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { ActivityFeed } from "@/components/live/activity-feed";
+import { QueuePanel } from "@/components/live/queue-panel";
+import { WinnerHistory } from "@/components/live/winner-history";
+import { LiveSessionHeader } from "@/components/live/live-session-header";
 import { CourtLiveCard } from "@/components/courts/court-live-card";
 import {
   createNextMatchForCourt,
@@ -44,11 +42,13 @@ export function CourtsLiveView({
   sessionId,
   isAdmin,
   showQueue = true,
+  showSidePanels = false,
   header,
 }: {
   sessionId: string;
   isAdmin: boolean;
   showQueue?: boolean;
+  showSidePanels?: boolean;
   header?: React.ReactNode;
 }) {
   const [bundle, setBundle] = useState<SessionBundle | null>(null);
@@ -79,7 +79,8 @@ export function CourtsLiveView({
   }, [sessionId]);
 
   useEffect(() => {
-    load();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- polling live session data
+    void load();
     const interval = setInterval(load, 15000);
     return () => clearInterval(interval);
   }, [load]);
@@ -311,12 +312,16 @@ export function CourtsLiveView({
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         {header ?? (
-          <div>
-            <h2 className="font-heading text-2xl font-bold text-sisclub-green-dark">
-              Live Courts
-            </h2>
-            <p className="text-sm text-muted-foreground">{session.title}</p>
-          </div>
+          showSidePanels && session ? (
+            <LiveSessionHeader session={session} />
+          ) : (
+            <div>
+              <h2 className="font-heading text-2xl font-bold text-sisclub-green-dark">
+                Live Courts
+              </h2>
+              <p className="text-sm text-muted-foreground">{session.title}</p>
+            </div>
+          )
         )}
         <Button
           variant="outline"
@@ -329,6 +334,7 @@ export function CourtsLiveView({
         </Button>
       </div>
 
+      {!showSidePanels && (
       <div className="flex flex-wrap gap-2 rounded-2xl border-2 border-sisclub-green-dark/15 bg-sisclub-green-dark p-3 text-white shadow-md">
         {[
           { label: "Game to", value: `${session.targetScore}` },
@@ -367,7 +373,10 @@ export function CourtsLiveView({
           </div>
         ))}
       </div>
+      )}
 
+      <div className={showSidePanels ? "grid gap-6 xl:grid-cols-[1fr_320px]" : ""}>
+        <div className="space-y-6">
       <div className="grid gap-6 xl:grid-cols-2">
         {courts.map((court) => {
           const match = courtMatches[court.id];
@@ -390,7 +399,9 @@ export function CourtsLiveView({
               winnerFlash={winnerFlash[court.id] ?? null}
               scoreInput={score}
               nextMatchPreview={
-                !match && court.status === "Empty" ? nextPreview ?? undefined : undefined
+                isAdmin && !match && court.status === "Empty"
+                  ? nextPreview ?? undefined
+                  : undefined
               }
               onScoreChange={(a, b) =>
                 setScores((s) => ({ ...s, [court.id]: { a, b } }))
@@ -406,62 +417,29 @@ export function CourtsLiveView({
         })}
       </div>
 
-      {showQueue && (
+      {showQueue && !showSidePanels && (
         <div className="grid gap-4 lg:grid-cols-2">
-          <Card className="rounded-3xl border-2 border-black/10">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-base">Queue</CardTitle>
-              <span className="rounded-full bg-sisclub-green px-2.5 py-0.5 text-xs font-bold text-white">
-                {queuePlayers.length}
-              </span>
-            </CardHeader>
-            <CardContent>
-              {queuePlayers.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No players waiting.</p>
-              ) : (
-                <ol className="max-h-64 space-y-2 overflow-y-auto text-sm">
-                  {queuePlayers.map((p, i) => (
-                    <li
-                      key={p.id}
-                      className="flex items-center justify-between rounded-xl border border-black/5 bg-white/80 px-3 py-2.5 shadow-sm"
-                    >
-                      <span className="flex items-center gap-2">
-                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-sisclub-green/15 text-xs font-bold text-sisclub-green-dark">
-                          {i + 1}
-                        </span>
-                        {p.name}
-                      </span>
-                      <span className="rounded-full bg-sisclub-pink-soft px-2 py-0.5 text-[10px] font-semibold text-sisclub-pink-dark">
-                        {p.skillLevel}
-                      </span>
-                    </li>
-                  ))}
-                </ol>
-              )}
-            </CardContent>
-          </Card>
+          <QueuePanel players={queuePlayers} />
 
-          {bundle?.activity && bundle.activity.length > 0 && (
-            <Card className="rounded-3xl border-2 border-black/10">
-              <CardHeader>
-                <CardTitle className="text-base">Activity</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-2 text-sm">
-                  {bundle.activity.slice(0, 8).map((item) => (
-                    <li
-                      key={item.id}
-                      className="rounded-xl bg-white/60 px-3 py-2 text-muted-foreground"
-                    >
-                      {item.message}
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
-            </Card>
+          {bundle?.activityLogs && bundle.activityLogs.length > 0 && (
+            <ActivityFeed logs={bundle.activityLogs} />
           )}
         </div>
       )}
+        </div>
+
+        {showSidePanels && bundle && session && (
+          <div className="space-y-4">
+            <QueuePanel players={queuePlayers} />
+            <WinnerHistory
+              session={session}
+              courts={bundle.courts}
+              matches={bundle.matches}
+            />
+            <ActivityFeed logs={bundle.activityLogs ?? []} />
+          </div>
+        )}
+      </div>
     </div>
   );
 }

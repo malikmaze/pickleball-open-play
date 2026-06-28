@@ -6,5 +6,5 @@ export default async function AdminCourtsRedirect({
   params: Promise<{ sessionId: string }>;
 }) {
   const { sessionId } = await params;
-  redirect(`/sessions/${sessionId}/courts`);
+  redirect(`/admin/sessions/${sessionId}/courts`);
 }

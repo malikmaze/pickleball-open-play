@@ -40,7 +40,7 @@ import {
   sessionFormToPayload,
   sessionToFormValues,
 } from "@/components/admin/session-form";
-import { defaultSessionFields } from "@/lib/sessions";
+import { defaultSessionFields, formatSessionDate } from "@/lib/sessions";
 import { seedSamplePlaySession } from "@/lib/sample-play";
 import { createClient } from "@/utils/supabase/client";
 import {
@@ -54,7 +54,7 @@ import type { Session } from "@/types";
 
 export default function AdminPage() {
   const router = useRouter();
-  const { sessions, isLoading, error, refetch } = useSessions();
+  const { sessions, isLoading, error, refetch } = useSessions("all");
   const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(emptySessionForm());
@@ -183,7 +183,7 @@ export default function AdminPage() {
       const sessionId = await seedSamplePlaySession(supabase);
       await refetch();
       toast.success("Sample play created!");
-      router.push(`/sessions/${sessionId}/courts`);
+      router.push(`/admin/sessions/${sessionId}/courts`);
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : "Failed to create sample play"
@@ -195,7 +195,7 @@ export default function AdminPage() {
 
   return (
     <PageShell>
-      <AppHeader subtitle="Organizer tools" backHref="/" />
+      <AppHeader subtitle="Admin dashboard" backHref="/" />
 
       <div className="py-6">
         <div className="mb-6 flex items-center justify-between gap-4">
@@ -204,7 +204,7 @@ export default function AdminPage() {
               Manage Sessions
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Create and manage today&apos;s open play
+              All scheduled open play sessions
             </p>
           </div>
           <div className="flex gap-2">
@@ -294,8 +294,8 @@ export default function AdminPage() {
                         {session.title}
                       </CardTitle>
                       <CardDescription className="mt-1">
-                        {session.startTime} – {session.endTime} ·{" "}
-                        {session.courtNumber}
+                        {formatSessionDate(session.date)} · {session.startTime}{" "}
+                        – {session.endTime} · {session.courtNumber}
                       </CardDescription>
                     </div>
                     <div className="flex gap-1.5">
@@ -313,7 +313,7 @@ export default function AdminPage() {
 
                   <div className="flex flex-wrap gap-2">
                     <Link
-                      href={`/sessions/${session.id}/courts`}
+                      href={`/admin/sessions/${session.id}/courts`}
                       className="inline-flex h-7 items-center rounded-full bg-sisclub-pink px-3 text-xs font-medium text-white hover:bg-sisclub-pink-dark"
                     >
                       Live Court View

@@ -18,6 +18,7 @@ export type SessionStatus = "open" | "full" | "closed";
 
 export type PlayerStatus =
   | "Registered"
+  | "Waitlisted"
   | "Secured"
   | "Present"
   | "Waiting"
@@ -33,11 +34,50 @@ export type SkillMatchingMode = "Strict" | "Balanced" | "Flexible";
 
 export type WinnerTeam = "A" | "B";
 
+export type UserRole = "guest" | "admin";
+
+export type ProfileGender =
+  | "Woman"
+  | "Man"
+  | "Non-binary"
+  | "Prefer not to say";
+
+export type ActivityEventType =
+  | "match_finished"
+  | "match_started"
+  | "now_calling"
+  | "check_in"
+  | "payment_confirmed"
+  | "side_change"
+  | "court_cleared";
+
+export interface UserProfile {
+  id: string;
+  email: string;
+  fullName: string;
+  contactNumber?: string;
+  gender: ProfileGender;
+  skillLevel: PlayerSkillLevel;
+  createdAt: string;
+}
+
+export interface ActivityLog {
+  id: string;
+  sessionId: string;
+  eventType: ActivityEventType;
+  title: string;
+  description: string;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+}
+
 export interface Player {
   id: string;
   sessionId: string;
+  userId?: string;
   name: string;
   contactNumber?: string;
+  gender?: ProfileGender;
   skillLevel: PlayerSkillLevel;
   note?: string;
   status: PlayerStatus;
@@ -107,6 +147,7 @@ export interface PlayerProfile {
   id: string;
   name: string;
   contactNumber?: string;
+  gender?: ProfileGender;
   skillLevel: PlayerSkillLevel;
 }
 
@@ -123,4 +164,5 @@ export interface SessionBundle {
   courts: Court[];
   matches: Match[];
   activity: SessionActivity[];
+  activityLogs: ActivityLog[];
 }

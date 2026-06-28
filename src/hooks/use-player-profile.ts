@@ -6,7 +6,7 @@ import {
   savePlayerProfile as persistProfile,
   subscribePlayerProfile,
 } from "@/lib/player-profile";
-import type { PlayerSkillLevel } from "@/types";
+import type { PlayerSkillLevel, ProfileGender } from "@/types";
 
 export function usePlayerProfile() {
   const profile = useSyncExternalStore(
@@ -16,7 +16,12 @@ export function usePlayerProfile() {
   );
 
   const saveProfile = useCallback(
-    (data: { name: string; contactNumber?: string; skillLevel: PlayerSkillLevel }) => {
+    (data: {
+      name: string;
+      contactNumber?: string;
+      gender?: ProfileGender;
+      skillLevel: PlayerSkillLevel;
+    }) => {
       return persistProfile(data);
     },
     []
@@ -27,6 +32,7 @@ export function usePlayerProfile() {
 
 export {
   getJoinedPlayerId,
+  getJoinedPlayerIds,
   setJoinedPlayerId,
   removeJoinedPlayerId,
 } from "@/lib/player-profile";

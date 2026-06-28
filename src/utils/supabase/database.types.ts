@@ -91,8 +91,10 @@ export type Database = {
         Row: {
           id: string;
           session_id: string;
+          user_id: string | null;
           name: string;
           contact_number: string | null;
+          gender: string | null;
           skill_level: string;
           joined_at: string;
           status: string;
@@ -106,8 +108,10 @@ export type Database = {
         Insert: {
           id?: string;
           session_id: string;
+          user_id?: string | null;
           name: string;
           contact_number?: string | null;
+          gender?: string | null;
           skill_level: string;
           joined_at?: string;
           status?: string;
@@ -121,8 +125,10 @@ export type Database = {
         Update: {
           id?: string;
           session_id?: string;
+          user_id?: string | null;
           name?: string;
           contact_number?: string | null;
+          gender?: string | null;
           skill_level?: string;
           joined_at?: string;
           status?: string;
@@ -295,6 +301,69 @@ export type Database = {
         };
         Relationships: [];
       };
+      profiles: {
+        Row: {
+          id: string;
+          email: string;
+          full_name: string;
+          contact_number: string | null;
+          gender: string;
+          skill_level: string;
+          role: string;
+          created_at: string;
+        };
+        Insert: {
+          id: string;
+          email: string;
+          full_name: string;
+          contact_number?: string | null;
+          gender: string;
+          skill_level: string;
+          role?: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          email?: string;
+          full_name?: string;
+          contact_number?: string | null;
+          gender?: string;
+          skill_level?: string;
+          role?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      activity_logs: {
+        Row: {
+          id: string;
+          session_id: string;
+          event_type: string;
+          title: string;
+          description: string;
+          metadata: Json;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          session_id: string;
+          event_type: string;
+          title: string;
+          description?: string;
+          metadata?: Json;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          session_id?: string;
+          event_type?: string;
+          title?: string;
+          description?: string;
+          metadata?: Json;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       admins: {
         Row: {
           id: string;
@@ -334,3 +403,5 @@ export type SessionRow = Database["public"]["Tables"]["sessions"]["Row"];
 export type PlayerRow = Database["public"]["Tables"]["players"]["Row"];
 export type CourtRow = Database["public"]["Tables"]["courts"]["Row"];
 export type MatchRow = Database["public"]["Tables"]["matches"]["Row"];
+export type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
+export type ActivityLogRow = Database["public"]["Tables"]["activity_logs"]["Row"];

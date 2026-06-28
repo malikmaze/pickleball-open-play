@@ -17,13 +17,9 @@ export async function isAdminUser(): Promise<boolean> {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user?.email) return false;
+  if (!user) return false;
 
-  const { data: admin } = await supabase
-    .from("admins")
-    .select("id")
-    .ilike("email", user.email)
-    .maybeSingle();
-
-  return !!admin;
+  const { data, error } = await supabase.rpc("is_admin");
+  if (error) return false;
+  return data === true;
 }

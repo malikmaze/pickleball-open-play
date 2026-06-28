@@ -51,13 +51,9 @@ export async function updateSession(request: NextRequest) {
       return NextResponse.redirect(url);
     }
 
-    const { data: admin } = await supabase
-      .from("admins")
-      .select("id")
-      .ilike("email", user.email ?? "")
-      .maybeSingle();
+    const { data: isAdmin, error } = await supabase.rpc("is_admin");
 
-    if (!admin) {
+    if (error || !isAdmin) {
       const url = request.nextUrl.clone();
       url.pathname = "/dashboard";
       url.searchParams.set("error", "unauthorized");
