@@ -437,6 +437,28 @@ export async function registerPlayerRecord(
 /** @deprecated Use registerPlayerRecord */
 export const joinSessionRecord = registerPlayerRecord;
 
+export async function findPlayerByContactInSession(
+  supabase: Client,
+  sessionId: string,
+  contactNumber: string
+): Promise<string | null> {
+  const normalized = contactNumber.trim();
+  if (!normalized) return null;
+
+  const { data, error } = await supabase
+    .from("players")
+    .select("id")
+    .eq("session_id", sessionId)
+    .eq("contact_number", normalized)
+    .neq("status", "No Show")
+    .order("joined_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data?.id ?? null;
+}
+
 export async function leaveSessionRecord(
   supabase: Client,
   playerId: string,

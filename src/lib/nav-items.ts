@@ -20,7 +20,7 @@ export interface NavItem {
 
 /** Guests (players): browse, join open play, watch live — no login. */
 const guestNav: NavItem[] = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/", label: "Home", icon: Home },
   { href: "/dashboard", label: "Sessions", icon: CalendarDays },
   { href: "/live", label: "Live", icon: Radio },
 ];
@@ -82,7 +82,14 @@ export function isNavActive(
     return pathname === "/";
   }
   if (label === "Sessions" || label === "Public") {
-    return pathname === "/dashboard" || pathname.startsWith("/session/");
+    return (
+      pathname === "/dashboard" ||
+      pathname.startsWith("/session/") ||
+      pathname.startsWith("/join")
+    );
+  }
+  if (label === "Live") {
+    return pathname === "/live" || pathname.includes("/live");
   }
   if (label === "Check-in") {
     return (

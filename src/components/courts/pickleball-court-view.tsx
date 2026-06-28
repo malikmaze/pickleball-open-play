@@ -43,7 +43,8 @@ function CourtPlayerChip({
         isA
           ? "border-pink-200/80 bg-gradient-to-r from-pink-50 to-rose-50"
           : "border-violet-200/80 bg-gradient-to-r from-violet-50 to-purple-50",
-        isTest && "ring-2 ring-amber-200/60"
+        isTest && "ring-2 ring-amber-200/60",
+        player.isYou && "ring-2 ring-sisclub-green shadow-md"
       )}
     >
       <div className="relative shrink-0">
@@ -64,6 +65,11 @@ function CourtPlayerChip({
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-semibold text-foreground">
           {player.name}
+          {player.isYou && (
+            <span className="ml-1.5 text-xs font-semibold text-sisclub-green">
+              (you)
+            </span>
+          )}
           {isTest && (
             <span className="ml-1.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-medium text-amber-700">
               demo

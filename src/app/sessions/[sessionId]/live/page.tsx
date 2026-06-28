@@ -5,14 +5,18 @@ import { Loader2 } from "lucide-react";
 import { AppHeader } from "@/components/app-header";
 import { CourtsLiveView } from "@/components/courts/courts-live-view";
 import { PageShell } from "@/components/page-shell";
+import { getJoinedPlayerId } from "@/hooks/use-player-profile";
 
 function LiveSessionContent({ sessionId }: { sessionId: string }) {
+  const highlightPlayerId = getJoinedPlayerId(sessionId);
+
   return (
     <CourtsLiveView
       sessionId={sessionId}
       isAdmin={false}
       showQueue={false}
       showSidePanels
+      highlightPlayerId={highlightPlayerId}
     />
   );
 }

@@ -5,4 +5,5 @@ export interface CourtPlayerInfo {
   skill?: string;
   gamesPlayed?: number;
   gender?: PlayerGender;
+  isYou?: boolean;
 }

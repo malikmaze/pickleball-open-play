@@ -43,12 +43,14 @@ export function CourtsLiveView({
   isAdmin,
   showQueue = true,
   showSidePanels = false,
+  highlightPlayerId,
   header,
 }: {
   sessionId: string;
   isAdmin: boolean;
   showQueue?: boolean;
   showSidePanels?: boolean;
+  highlightPlayerId?: string;
   header?: React.ReactNode;
 }) {
   const [bundle, setBundle] = useState<SessionBundle | null>(null);
@@ -419,6 +421,7 @@ export function CourtsLiveView({
                   ? nextPreview ?? undefined
                   : undefined
               }
+              highlightPlayerId={highlightPlayerId}
               onScoreChange={(a, b) =>
                 setScores((s) => ({ ...s, [court.id]: { a, b } }))
               }
@@ -435,7 +438,10 @@ export function CourtsLiveView({
 
       {showQueue && !showSidePanels && (
         <div className="grid gap-4 lg:grid-cols-2">
-          <QueuePanel players={queuePlayers} />
+          <QueuePanel
+            players={queuePlayers}
+            highlightPlayerId={highlightPlayerId}
+          />
 
           {bundle?.activityLogs && bundle.activityLogs.length > 0 && (
             <ActivityFeed logs={bundle.activityLogs} />
@@ -446,7 +452,10 @@ export function CourtsLiveView({
 
         {showSidePanels && bundle && session && (
           <div className="space-y-4">
-            <QueuePanel players={queuePlayers} />
+            <QueuePanel
+            players={queuePlayers}
+            highlightPlayerId={highlightPlayerId}
+          />
             <WinnerHistory
               session={session}
               courts={bundle.courts}

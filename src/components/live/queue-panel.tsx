@@ -2,6 +2,7 @@
 
 import type { QueuePlayer } from "@/lib/queue/queue-engine";
 import { formatWaitingTime } from "@/lib/queue/wait-time";
+import { cn } from "@/lib/utils";
 import {
   Card,
   CardContent,
@@ -9,7 +10,13 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
-export function QueuePanel({ players }: { players: QueuePlayer[] }) {
+export function QueuePanel({
+  players,
+  highlightPlayerId,
+}: {
+  players: QueuePlayer[];
+  highlightPlayerId?: string;
+}) {
   return (
     <Card className="rounded-3xl border-2 border-black/10">
       <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -26,13 +33,32 @@ export function QueuePanel({ players }: { players: QueuePlayer[] }) {
             {players.map((p, i) => (
               <li
                 key={p.id}
-                className="flex items-center justify-between gap-2 rounded-xl border border-black/5 bg-white/80 px-3 py-2.5 shadow-sm"
+                className={cn(
+                  "flex items-center justify-between gap-2 rounded-xl border px-3 py-2.5 shadow-sm",
+                  p.id === highlightPlayerId
+                    ? "border-sisclub-green/50 bg-sisclub-green/10 ring-2 ring-sisclub-green/30"
+                    : "border-black/5 bg-white/80"
+                )}
               >
                 <span className="flex min-w-0 items-center gap-2">
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-sisclub-green/15 text-xs font-bold text-sisclub-green-dark">
+                  <span
+                    className={cn(
+                      "flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold",
+                      p.id === highlightPlayerId
+                        ? "bg-sisclub-green text-white"
+                        : "bg-sisclub-green/15 text-sisclub-green-dark"
+                    )}
+                  >
                     {i + 1}
                   </span>
-                  <span className="truncate font-medium">{p.name}</span>
+                  <span className="truncate font-medium">
+                    {p.name}
+                    {p.id === highlightPlayerId && (
+                      <span className="ml-1.5 text-xs font-semibold text-sisclub-green">
+                        (you)
+                      </span>
+                    )}
+                  </span>
                 </span>
                 <span className="flex shrink-0 items-center gap-2">
                   <span className="hidden text-xs text-muted-foreground sm:inline">
