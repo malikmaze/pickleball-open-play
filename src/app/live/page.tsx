@@ -115,8 +115,8 @@ export default function LivePage() {
   return (
     <PageShell>
       <AppHeader subtitle="Live open play" backHref="/dashboard" />
-      <div className="py-6">
-        <h2 className="mb-4 font-heading text-2xl font-bold text-sisclub-green-dark">
+      <div className="py-4 sm:py-6">
+        <h2 className="mb-4 font-heading text-xl font-bold text-sisclub-green-dark sm:text-2xl">
           Live Sessions
         </h2>
         <Suspense

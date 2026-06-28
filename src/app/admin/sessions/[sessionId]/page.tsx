@@ -221,9 +221,9 @@ function SessionAdminContent({ sessionId }: { sessionId: string }) {
 
   return (
     <>
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <div>
-          <h2 className="font-heading text-2xl font-bold text-sisclub-green-dark">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <h2 className="font-heading text-xl font-bold text-sisclub-green-dark sm:text-2xl">
             {session.title}
           </h2>
           <p className="text-sm text-muted-foreground">
@@ -519,8 +519,8 @@ export default function SessionAdminPage({
   }
 
   return (
-    <PageShell>
-      <AppHeader subtitle="Session management" backHref="/admin" />
+    <PageShell size="wide">
+      <AppHeader subtitle="Session management" backHref="/admin" size="wide" />
       <div className="py-6">
         <Suspense fallback={<Loader2 className="mx-auto h-8 w-8 animate-spin text-sisclub-green" />}>
           <SessionAdminContent sessionId={sessionId} />

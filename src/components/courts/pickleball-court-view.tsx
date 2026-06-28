@@ -116,7 +116,7 @@ export function PickleballCourtView({
           <Sparkles className="h-3 w-3" />
           {isPlaying ? "Live rally" : "Court view"}
         </div>
-        <div className="aspect-[4/3] min-h-[280px] w-full">
+        <div className="aspect-[4/3] min-h-[200px] w-full sm:min-h-[260px] md:min-h-[280px]">
           <PickleballCourt3D
             teamA={teamA}
             teamB={teamB}
@@ -131,7 +131,7 @@ export function PickleballCourtView({
       </div>
 
       {hasPlayers && (
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="space-y-2">
             <p className="flex items-center gap-1 text-xs font-bold uppercase tracking-wide text-pink-500">
               <Heart className="h-3 w-3 fill-pink-300" />
@@ -187,7 +187,7 @@ export function CourtScoreboard({
             key={teamAScore}
             initial={{ scale: 1.3, opacity: 0.5 }}
             animate={{ scale: 1, opacity: 1 }}
-            className="font-heading text-4xl font-bold leading-none drop-shadow"
+            className="font-heading text-3xl font-bold leading-none drop-shadow sm:text-4xl"
           >
             {teamAScore}
           </motion.span>
@@ -220,7 +220,7 @@ export function CourtScoreboard({
             key={teamBScore}
             initial={{ scale: 1.3, opacity: 0.5 }}
             animate={{ scale: 1, opacity: 1 }}
-            className="font-heading text-4xl font-bold leading-none drop-shadow"
+            className="font-heading text-3xl font-bold leading-none drop-shadow sm:text-4xl"
           >
             {teamBScore}
           </motion.span>

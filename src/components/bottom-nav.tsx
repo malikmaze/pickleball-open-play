@@ -26,7 +26,7 @@ export function BottomNav() {
                 key={item.label}
                 type="button"
                 onClick={() => signOut()}
-                className="flex flex-1 flex-col items-center gap-1 py-3 text-xs font-medium text-muted-foreground transition-all hover:text-sisclub-green/70"
+                className="flex flex-1 flex-col items-center gap-1 py-3 text-xs font-medium text-muted-foreground transition-all hover:text-sisclub-green/70 min-h-11 justify-center"
               >
                 <Icon className="h-5 w-5" strokeWidth={2} />
                 <span>{item.label}</span>
@@ -48,7 +48,7 @@ export function BottomNav() {
                 }
               }}
               className={cn(
-                "flex flex-1 flex-col items-center gap-1 py-3 text-xs font-medium transition-all",
+                "flex min-h-11 min-w-[4.5rem] flex-1 flex-col items-center justify-center gap-1 py-2.5 text-[11px] font-medium transition-all sm:text-xs",
                 active
                   ? "text-sisclub-green"
                   : "text-muted-foreground hover:text-sisclub-green/70"

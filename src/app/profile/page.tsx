@@ -75,7 +75,7 @@ function ProfileForm({
   return (
     <PageShell>
       <AppHeader subtitle="Your profile" backHref="/dashboard" />
-      <div className="py-6">
+      <div className="py-4 sm:py-6">
         <Card className="rounded-3xl border-2 border-black/10 shadow-md">
           <CardHeader>
             <CardTitle className="font-heading text-xl text-sisclub-green-dark">

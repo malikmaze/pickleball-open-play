@@ -202,12 +202,12 @@ export function CourtLiveCard({
       </CardContent>
 
       {isAdmin && (
-        <CardFooter className="flex flex-wrap gap-2 border-t border-black/5 pt-4">
+        <CardFooter className="flex flex-col gap-2 border-t border-black/5 pt-4 sm:flex-row sm:flex-wrap">
           {!match && court.status !== "Playing" && (
             <Button
               disabled={busy}
               onClick={onAssign}
-              className="rounded-full bg-sisclub-green hover:bg-sisclub-green-dark"
+              className="min-h-11 w-full rounded-full bg-sisclub-green hover:bg-sisclub-green-dark sm:w-auto"
             >
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Assign Next Match"}
             </Button>
@@ -216,7 +216,7 @@ export function CourtLiveCard({
             <Button
               disabled={busy}
               onClick={onStart}
-              className="rounded-full bg-sisclub-green hover:bg-sisclub-green-dark"
+              className="min-h-11 w-full rounded-full bg-sisclub-green hover:bg-sisclub-green-dark sm:w-auto"
             >
               Start Match
             </Button>
@@ -253,14 +253,14 @@ export function CourtLiveCard({
                 disabled={busy}
                 variant="outline"
                 onClick={onUpdateScore}
-                className="rounded-full"
+                className="min-h-11 w-full rounded-full sm:w-auto"
               >
                 Update Score
               </Button>
               <Button
                 disabled={busy}
                 onClick={onEndMatch}
-                className="rounded-full bg-sisclub-pink text-white hover:bg-sisclub-pink-dark"
+                className="min-h-11 w-full rounded-full bg-sisclub-pink text-white hover:bg-sisclub-pink-dark sm:w-auto"
               >
                 End Match
               </Button>
@@ -269,7 +269,7 @@ export function CourtLiveCard({
                   disabled={busy}
                   variant="outline"
                   onClick={onChangeSides}
-                  className="rounded-full"
+                  className="min-h-11 w-full rounded-full sm:w-auto"
                 >
                   <ArrowLeftRight className="mr-1 h-4 w-4" />
                   Change Sides
@@ -282,7 +282,7 @@ export function CourtLiveCard({
               disabled={busy}
               variant="destructive"
               onClick={onClear}
-              className="rounded-full"
+              className="min-h-11 w-full rounded-full sm:w-auto"
             >
               Clear Court
             </Button>

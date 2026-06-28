@@ -140,9 +140,9 @@ function DashboardContent() {
     <PageShell>
       <AppHeader subtitle="Today & upcoming" />
 
-      <div className="py-6">
+      <div className="py-4 sm:py-6">
         <div className="mb-6">
-          <h2 className="font-heading text-2xl font-bold text-sisclub-green-dark">
+          <h2 className="font-heading text-xl font-bold text-sisclub-green-dark sm:text-2xl">
             Open Play Schedule
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">

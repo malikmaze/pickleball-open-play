@@ -126,11 +126,13 @@
   * {
     @apply border-border outline-ring/50;
   }
-  body {
-    @apply bg-background text-foreground;
-  }
   html {
     @apply font-sans;
+    overflow-x: clip;
+  }
+  body {
+    @apply bg-background text-foreground;
+    overflow-x: clip;
   }
   h1, h2, h3, h4 {
     font-family: var(--font-heading), serif;
@@ -171,4 +173,13 @@
 .animate-fade-in-up-delay-3 {
   animation: fade-in-up 0.5s ease-out 0.3s forwards;
   opacity: 0;
+}
+
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
 }

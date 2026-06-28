@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { layoutContainerClass } from "@/lib/layout";
 import { getNavItems, isNavActive } from "@/lib/nav-items";
 import { useAuth } from "@/hooks/use-auth";
 
@@ -14,8 +15,13 @@ export function DesktopNav() {
   const items = getNavItems(loading ? "guest" : role, pathname);
 
   return (
-    <nav className="hidden border-b-2 border-black/10 bg-white/90 backdrop-blur-md md:block">
-      <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-center gap-1 px-4 py-2">
+    <nav className="hidden border-b-2 border-black/10 bg-white/90 backdrop-blur-md supports-[backdrop-filter]:bg-white/80 md:block">
+      <div
+        className={cn(
+          layoutContainerClass("full"),
+          "flex flex-wrap items-center justify-center gap-1 py-2"
+        )}
+      >
         {items.map((item) => {
           const Icon = item.icon;
 

@@ -334,7 +334,7 @@ export function CourtsLiveView({
             <LiveSessionHeader session={session} />
           ) : (
             <div>
-              <h2 className="font-heading text-2xl font-bold text-sisclub-green-dark">
+              <h2 className="font-heading text-xl font-bold text-sisclub-green-dark sm:text-2xl">
                 Live Courts
               </h2>
               <p className="text-sm text-muted-foreground">{session.title}</p>
@@ -353,7 +353,7 @@ export function CourtsLiveView({
       </div>
 
       {!showSidePanels && (
-      <div className="flex flex-wrap gap-2 rounded-2xl border-2 border-sisclub-green-dark/15 bg-sisclub-green-dark p-3 text-white shadow-md">
+      <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 scrollbar-none sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0 rounded-2xl border-2 border-sisclub-green-dark/15 bg-sisclub-green-dark p-3 text-white shadow-md">
         {[
           { label: "Game to", value: `${session.targetScore}` },
           { label: "Win by", value: `${session.winBy}` },
@@ -374,7 +374,7 @@ export function CourtsLiveView({
         ].map((stat) => (
           <div
             key={stat.label}
-            className="flex min-w-[88px] flex-1 flex-col rounded-xl bg-white/10 px-3 py-2"
+            className="flex min-w-[5.5rem] shrink-0 flex-col rounded-xl bg-white/10 px-3 py-2 sm:min-w-[88px] sm:flex-1"
           >
             <span className="text-[10px] uppercase tracking-wide text-white/60">
               {stat.label}
@@ -393,9 +393,9 @@ export function CourtsLiveView({
       </div>
       )}
 
-      <div className={showSidePanels ? "grid gap-6 xl:grid-cols-[1fr_320px]" : ""}>
+      <div className={showSidePanels ? "grid gap-6 lg:grid-cols-[1fr_minmax(260px,320px)]" : ""}>
         <div className="space-y-6">
-      <div className="grid gap-6 xl:grid-cols-2">
+      <div className="grid gap-4 sm:gap-6 md:grid-cols-2">
         {courts.map((court) => {
           const match = courtMatches[court.id];
           const finishedMatch =
@@ -437,7 +437,7 @@ export function CourtsLiveView({
       </div>
 
       {showQueue && !showSidePanels && (
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="grid gap-4 md:grid-cols-2">
           <QueuePanel
             players={queuePlayers}
             highlightPlayerId={highlightPlayerId}
