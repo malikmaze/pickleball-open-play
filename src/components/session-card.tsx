@@ -2,9 +2,14 @@
 
 import Link from "next/link";
 import { Clock, MapPin, Users } from "lucide-react";
-import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import type { Session } from "@/types";
+import type { PlayerStatus, Session } from "@/types";
+import { canPlayerWithdrawRegistration } from "@/lib/player-permissions";
+import {
+  countAdmittedPlayers,
+  getWaitlistedPlayers,
+  isAdmittedPlayer,
+} from "@/lib/waitlist";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -14,14 +19,17 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { SkillBadge, StatusBadge } from "@/components/status-badge";
+import { formatSessionDate, isSessionPast } from "@/lib/sessions";
 import { cn } from "@/lib/utils";
 
 interface SessionCardProps {
   session: Session;
   currentPlayerId?: string;
+  myPlayerStatus?: PlayerStatus;
   onJoin?: (sessionId: string) => void;
   onLeave?: (sessionId: string) => void;
   isLoading?: boolean;
+  canRegister?: boolean;
 }
 
 function formatTimeRange(start: string, end: string) {
@@ -40,16 +48,32 @@ function formatTimeRange(start: string, end: string) {
 export function SessionCard({
   session,
   currentPlayerId,
+  myPlayerStatus,
   onJoin,
   onLeave,
   isLoading,
+  canRegister = true,
 }: SessionCardProps) {
   const router = useRouter();
   const isJoined = currentPlayerId
     ? session.players.some((p) => p.id === currentPlayerId)
     : false;
-  const canJoin = session.status === "open" && !isJoined;
-  const canLeave = isJoined && session.status !== "closed";
+  const admittedPlayers = session.players.filter((p) =>
+    isAdmittedPlayer(p.status)
+  );
+  const admittedCount = countAdmittedPlayers(session.players);
+  const waitlistCount = getWaitlistedPlayers(session.players).length;
+  const isWaitlisted = myPlayerStatus === "Waitlisted";
+  const isPast = isSessionPast(session.date);
+  const canJoin =
+    canRegister && !isPast && session.status === "open" && !isJoined;
+  const canJoinWaitlist =
+    canRegister && !isPast && session.status === "full" && !isJoined;
+  const canWithdraw =
+    myPlayerStatus !== undefined &&
+    canPlayerWithdrawRegistration(myPlayerStatus);
+  const canLeave =
+    isJoined && session.status !== "closed" && canWithdraw;
 
   const handleJoin = () => {
     if (!onJoin) {
@@ -62,7 +86,6 @@ export function SessionCard({
   const handleLeave = () => {
     if (!onLeave || !currentPlayerId) return;
     onLeave(session.id);
-    toast.success("You've left the session");
   };
 
   return (
@@ -87,7 +110,12 @@ export function SessionCard({
       <CardContent className="space-y-2.5 text-sm">
         <div className="flex items-center gap-2 text-foreground/80">
           <Clock className="h-4 w-4 shrink-0 text-sisclub-green" />
-          <span>{formatTimeRange(session.startTime, session.endTime)}</span>
+          <span>
+            <span className="font-medium text-sisclub-green-dark">
+              {formatSessionDate(session.date)} ·{" "}
+            </span>
+            {formatTimeRange(session.startTime, session.endTime)}
+          </span>
         </div>
         <div className="flex items-center gap-2 text-foreground/80">
           <MapPin className="h-4 w-4 shrink-0 text-sisclub-green" />
@@ -99,20 +127,26 @@ export function SessionCard({
           <Users className="h-4 w-4 shrink-0 text-sisclub-green" />
           <span>
             <span className="font-semibold text-sisclub-green-dark">
-              {session.players.length}
+              {admittedCount}
             </span>
             {" / "}
             {session.maxPlayers} players
+            {waitlistCount > 0 && (
+              <span className="text-muted-foreground">
+                {" "}
+                · {waitlistCount} on waitlist
+              </span>
+            )}
           </span>
         </div>
 
-        {session.players.length > 0 && (
+        {admittedPlayers.length > 0 && (
           <div className="mt-3 rounded-2xl bg-sisclub-pink-soft/50 px-3 py-2">
             <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
               Joined
             </p>
             <p className="text-sm text-foreground/90">
-              {session.players.map((p) => p.name).join(", ")}
+              {admittedPlayers.map((p) => p.name).join(", ")}
             </p>
           </div>
         )}
@@ -125,7 +159,17 @@ export function SessionCard({
             disabled={isLoading}
             className="flex-1 rounded-full border-2 border-black/10 bg-sisclub-green font-semibold text-white shadow-sm transition-all hover:bg-sisclub-green-dark hover:shadow-md"
           >
-            Register
+            Join
+          </Button>
+        )}
+        {canJoinWaitlist && (
+          <Button
+            onClick={handleJoin}
+            disabled={isLoading}
+            variant="outline"
+            className="flex-1 rounded-full border-2 border-amber-300/80 bg-amber-50 font-semibold text-amber-900 shadow-sm transition-all hover:bg-amber-100"
+          >
+            Join waitlist
           </Button>
         )}
         {canLeave && (
@@ -135,18 +179,29 @@ export function SessionCard({
             disabled={isLoading}
             className="flex-1 rounded-full border-2 border-black/10 font-semibold transition-all hover:bg-sisclub-pink-soft"
           >
-            Leave
+            {isWaitlisted ? "Leave waitlist" : "Leave session"}
           </Button>
         )}
-        {session.status === "full" && !isJoined && (
+        {isJoined && !canLeave && myPlayerStatus && !isWaitlisted && (
+          <p className="w-full text-center text-xs text-muted-foreground">
+            Checked in — ask the admin to remove you from the queue if needed
+          </p>
+        )}
+        {isWaitlisted && (
+          <p className="w-full text-center text-xs font-medium text-amber-800">
+            On waitlist — you will be added automatically if a spot opens
+          </p>
+        )}
+        {isPast && !isJoined && (
           <Button
             disabled
+            variant="outline"
             className="flex-1 rounded-full border-2 border-black/10"
           >
-            Session Full
+            Past session
           </Button>
         )}
-        {session.status === "closed" && (
+        {session.status === "closed" && !isJoined && !isPast && (
           <Button
             disabled
             variant="outline"
@@ -163,6 +218,12 @@ export function SessionCard({
             View my status →
           </Link>
         )}
+        <Link
+          href={`/sessions/${session.id}/live`}
+          className="text-center text-xs font-medium text-sisclub-pink-dark underline-offset-2 hover:underline"
+        >
+          Watch live →
+        </Link>
       </CardFooter>
     </Card>
   );

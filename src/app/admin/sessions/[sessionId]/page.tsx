@@ -36,14 +36,21 @@ import {
   getEligiblePlayers,
   toQueuePlayer,
 } from "@/lib/queue/queue-engine";
+import {
+  countAdmittedPlayers,
+  getWaitlistedPlayers,
+  isAdmittedPlayer,
+} from "@/lib/waitlist";
 import { createClient } from "@/utils/supabase/client";
 import {
   addTestPlayersToSession,
+  admitWaitlistedPlayerRecord,
   deletePlayerRecord,
   fetchSessionBundle,
   markPlayerNoShow,
   markPlayerPresent,
   markPlayerSecured,
+  processWaitlistPromotions,
   updatePlayerRecord,
   updateSessionRecord,
 } from "@/utils/supabase/queries";
@@ -121,10 +128,28 @@ function SessionAdminContent({ sessionId }: { sessionId: string }) {
     const supabase = createClient();
     try {
       await deletePlayerRecord(supabase, playerId);
-      toast.success("Player removed");
+      const promoted = await processWaitlistPromotions(supabase, sessionId);
+      if (promoted > 0) {
+        toast.success(
+          `Player removed · ${promoted} waitlisted player${promoted === 1 ? "" : "s"} admitted`
+        );
+      } else {
+        toast.success("Player removed");
+      }
       await load();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Remove failed");
+    }
+  };
+
+  const handleAdmitWaitlisted = async (playerId: string) => {
+    const supabase = createClient();
+    try {
+      await admitWaitlistedPlayerRecord(supabase, sessionId, playerId);
+      toast.success("Player admitted from waitlist");
+      await load();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Admit failed");
     }
   };
 
@@ -223,7 +248,11 @@ function SessionAdminContent({ sessionId }: { sessionId: string }) {
               <CardTitle>Session snapshot</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2 text-sm">
-              <p>Registered: {session.players.length}</p>
+              <p>
+                Joined: {countAdmittedPlayers(session.players)} /{" "}
+                {session.maxPlayers}
+              </p>
+              <p>Waitlist: {getWaitlistedPlayers(session.players).length}</p>
               <p>Present: {session.players.filter((p) => p.status === "Present" || p.status === "Waiting").length}</p>
               <p>In queue: {eligible.length}</p>
               <p>Playing: {session.players.filter((p) => p.status === "Playing").length}</p>
@@ -273,13 +302,22 @@ function SessionAdminContent({ sessionId }: { sessionId: string }) {
             </p>
           </div>
           <PlayerList
-            players={session.players}
+            players={session.players.filter((p) => isAdmittedPlayer(p.status))}
             mode={tab}
             session={session}
             onStatus={handlePlayerStatus}
             onRemove={handleRemovePlayer}
             onSkillChange={handleSkillChange}
           />
+          {tab === "registrations" && (
+            <WaitlistPanel
+              players={getWaitlistedPlayers(session.players)}
+              admittedCount={countAdmittedPlayers(session.players)}
+              maxPlayers={session.maxPlayers}
+              onAdmit={handleAdmitWaitlisted}
+              onRemove={handleRemovePlayer}
+            />
+          )}
         </>
       )}
 
@@ -288,7 +326,8 @@ function SessionAdminContent({ sessionId }: { sessionId: string }) {
           <CardHeader>
             <CardTitle>Active queue</CardTitle>
             <CardDescription>
-              Fair order: fewest games played, then longest wait
+              Fair order: fewest games played, then longest wait. Remove players
+              who leave the court.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -298,7 +337,7 @@ function SessionAdminContent({ sessionId }: { sessionId: string }) {
               eligible.map((p, i) => (
                 <div
                   key={p.id}
-                  className="flex items-center justify-between rounded-2xl bg-sisclub-pink-soft/40 px-4 py-3"
+                  className="flex items-center justify-between gap-2 rounded-2xl bg-sisclub-pink-soft/40 px-4 py-3"
                 >
                   <div>
                     <p className="font-semibold">
@@ -308,11 +347,21 @@ function SessionAdminContent({ sessionId }: { sessionId: string }) {
                       {p.skillLevel} · {p.gamesPlayed} games played
                     </p>
                   </div>
-                  <PlayerStatusBadge status={p.status} />
+                  <div className="flex items-center gap-2">
+                    <PlayerStatusBadge status={p.status} />
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      className="rounded-full"
+                      onClick={() => handleRemovePlayer(p.id)}
+                    >
+                      Remove
+                    </Button>
+                  </div>
                 </div>
               ))
             )}
-            <Link href={`/sessions/${sessionId}/courts`}>
+            <Link href={`/admin/sessions/${sessionId}/courts`}>
               <Button className="mt-2 rounded-full bg-sisclub-green hover:bg-sisclub-green-dark">
                 Manage Courts
               </Button>
@@ -340,6 +389,76 @@ function SessionAdminContent({ sessionId }: { sessionId: string }) {
   );
 }
 
+function WaitlistPanel({
+  players,
+  admittedCount,
+  maxPlayers,
+  onAdmit,
+  onRemove,
+}: {
+  players: Player[];
+  admittedCount: number;
+  maxPlayers: number;
+  onAdmit: (playerId: string) => void;
+  onRemove: (playerId: string) => void;
+}) {
+  const hasCapacity = admittedCount < maxPlayers;
+
+  return (
+    <div className="mt-8 space-y-3">
+      <div>
+        <h3 className="font-heading text-lg font-bold text-sisclub-green-dark">
+          Waitlist
+        </h3>
+        <p className="text-sm text-muted-foreground">
+          First in line is admitted automatically when a spot opens. You can
+          also admit manually if there is room.
+        </p>
+      </div>
+      {players.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No one on the waitlist.</p>
+      ) : (
+        players.map((player, index) => (
+          <Card key={player.id} className="rounded-2xl border-2 border-orange-200/80">
+            <CardContent className="flex flex-wrap items-center justify-between gap-3 pt-4">
+              <div>
+                <p className="font-semibold text-sisclub-green-dark">
+                  #{index + 1} {player.name}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {player.skillLevel} · joined{" "}
+                  {new Date(player.joinedAt).toLocaleTimeString([], {
+                    hour: "numeric",
+                    minute: "2-digit",
+                  })}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  className="rounded-full bg-sisclub-green hover:bg-sisclub-green-dark"
+                  disabled={!hasCapacity}
+                  onClick={() => onAdmit(player.id)}
+                >
+                  Admit
+                </Button>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  className="rounded-full"
+                  onClick={() => onRemove(player.id)}
+                >
+                  Remove
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        ))
+      )}
+    </div>
+  );
+}
+
 function PlayerList({
   players,
   mode,
@@ -358,12 +477,12 @@ function PlayerList({
   return (
     <div className="space-y-3">
       {players.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No registrations yet.</p>
+        <p className="text-sm text-muted-foreground">No one has joined yet.</p>
       ) : (
         players.map((player) => {
           const waitLabel = player.checkedInAt
             ? `checked in ${new Date(player.checkedInAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`
-            : `registered ${new Date(player.joinedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`;
+            : `joined ${new Date(player.joinedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`;
 
           return (
             <Card key={player.id} className="rounded-2xl border-2 border-black/10">
@@ -406,6 +525,13 @@ function PlayerList({
                     </Select>
                     <Button size="sm" variant="destructive" className="rounded-full" onClick={() => onRemove(player.id)}>
                       Remove
+                    </Button>
+                  </div>
+                )}
+                {mode === "registrations" && (
+                  <div className="flex flex-wrap gap-2">
+                    <Button size="sm" variant="destructive" className="rounded-full" onClick={() => onRemove(player.id)}>
+                      Remove from session
                     </Button>
                   </div>
                 )}

@@ -50,16 +50,17 @@ export default function LandingPage() {
           >
             Join Open Play
           </Link>
-          <Link
-            href="/login"
-            className="inline-flex h-12 items-center justify-center rounded-full border-2 border-black/10 bg-background font-semibold transition-all hover:bg-sisclub-pink-soft"
-          >
-            Organizer Login
-          </Link>
         </div>
 
         <p className="animate-fade-in-up-delay-3 mt-12 text-xs text-muted-foreground">
           EST 2026 · sisclubph
+          <span className="mx-2">·</span>
+          <Link
+            href="/login"
+            className="underline-offset-2 hover:text-sisclub-green hover:underline"
+          >
+            Admin
+          </Link>
         </p>
       </div>
     </PageShell>

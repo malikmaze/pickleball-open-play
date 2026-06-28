@@ -8,6 +8,7 @@ export interface QueuePlayer {
   status: PlayerStatus;
   gamesPlayed: number;
   checkedInAt: string | null;
+  lastPlayedAt: string | null;
   joinedAt: string;
   isActive: boolean;
 }
@@ -36,13 +37,14 @@ const SKILL_COMPATIBILITY: Record<PlayerSkillLevel, PlayerSkillLevel[]> = {
   Advanced: ["Intermediate High", "Advanced"],
 };
 
+import { waitingSinceTimestamp } from "@/lib/queue/wait-time";
+
 function skillValue(level: PlayerSkillLevel): number {
   return SKILL_NUMERIC[level];
 }
 
 function waitingSince(player: QueuePlayer): number {
-  const ts = player.checkedInAt ?? player.joinedAt;
-  return new Date(ts).getTime();
+  return waitingSinceTimestamp(player);
 }
 
 function queuePriority(player: QueuePlayer): [number, number] {
@@ -247,6 +249,7 @@ export function toQueuePlayer(player: {
   status: PlayerStatus;
   gamesPlayed: number;
   checkedInAt?: string;
+  lastPlayedAt?: string;
   joinedAt: string;
   isActive: boolean;
 }): QueuePlayer {
@@ -257,6 +260,7 @@ export function toQueuePlayer(player: {
     status: player.status,
     gamesPlayed: player.gamesPlayed,
     checkedInAt: player.checkedInAt ?? null,
+    lastPlayedAt: player.lastPlayedAt ?? null,
     joinedAt: player.joinedAt,
     isActive: player.isActive,
   };

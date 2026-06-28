@@ -1,4 +1,5 @@
-import type { PlayerProfile, PlayerSkillLevel } from "@/types";
+import type { PlayerProfile, PlayerSkillLevel, ProfileGender } from "@/types";
+import { normalizeProfileGender } from "@/lib/constants";
 
 const PROFILE_KEY = "sisclub-player-profile";
 const JOINED_KEY = "sisclub-joined-players";
@@ -21,7 +22,15 @@ export function getPlayerProfile(): PlayerProfile | null {
     const raw = sessionStorage.getItem(PROFILE_KEY);
     if (raw === cachedRaw) return cachedProfile;
     cachedRaw = raw;
-    cachedProfile = raw ? (JSON.parse(raw) as PlayerProfile) : null;
+    if (!raw) {
+      cachedProfile = null;
+      return cachedProfile;
+    }
+    const parsed = JSON.parse(raw) as PlayerProfile;
+    cachedProfile = {
+      ...parsed,
+      gender: normalizeProfileGender(parsed.gender),
+    };
     return cachedProfile;
   } catch {
     invalidateProfileCache();
@@ -32,12 +41,16 @@ export function getPlayerProfile(): PlayerProfile | null {
 export function savePlayerProfile(profile: {
   name: string;
   contactNumber?: string;
+  gender?: ProfileGender;
   skillLevel: PlayerSkillLevel;
 }): PlayerProfile {
   const saved: PlayerProfile = {
     id: getPlayerProfile()?.id ?? crypto.randomUUID(),
     name: profile.name.trim(),
     contactNumber: profile.contactNumber?.trim() || undefined,
+    gender: profile.gender
+      ? normalizeProfileGender(profile.gender)
+      : undefined,
     skillLevel: profile.skillLevel,
   };
 

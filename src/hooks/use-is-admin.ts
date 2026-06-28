@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
+import { checkIsAdmin } from "@/utils/supabase/queries";
 
 export function useIsAdmin() {
   const [isAdmin, setIsAdmin] = useState(false);
@@ -16,16 +17,12 @@ export function useIsAdmin() {
         const {
           data: { user },
         } = await supabase.auth.getUser();
-        if (!user?.email) {
+        if (!user) {
           if (!cancelled) setIsAdmin(false);
           return;
         }
-        const { data: admin } = await supabase
-          .from("admins")
-          .select("id")
-          .ilike("email", user.email)
-          .maybeSingle();
-        if (!cancelled) setIsAdmin(!!admin);
+        const admin = await checkIsAdmin(supabase);
+        if (!cancelled) setIsAdmin(admin);
       } catch {
         if (!cancelled) setIsAdmin(false);
       } finally {

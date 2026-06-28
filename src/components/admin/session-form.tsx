@@ -225,7 +225,7 @@ export function SessionForm({
       <Card className="rounded-3xl border-2 border-black/10">
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Payment Settings</CardTitle>
-          <CardDescription>Registration payment rules</CardDescription>
+          <CardDescription>Payment rules for joining</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           <CheckboxField

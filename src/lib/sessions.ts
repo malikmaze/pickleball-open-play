@@ -1,4 +1,5 @@
 import { normalizePlayerSkill } from "@/lib/constants";
+import { countAdmittedPlayers } from "@/lib/waitlist";
 import type {
   CourtRow,
   Database,
@@ -8,19 +9,24 @@ import type {
 } from "@/utils/supabase/database.types";
 
 type ActivityRow = Database["public"]["Tables"]["session_activity"]["Row"];
+type ActivityLogRow = Database["public"]["Tables"]["activity_logs"]["Row"];
+type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
 import type {
   Court,
   CourtStatus,
   Match,
   MatchStatus,
   Player,
-  PlayerSkillLevel,
   PlayerStatus,
   Session,
+  ActivityLog,
+  ActivityEventType,
+  ProfileGender,
   SessionActivity,
   SessionSkillLevel,
   SessionStatus,
   SkillMatchingMode,
+  UserProfile,
   WinnerTeam,
 } from "@/types";
 
@@ -42,8 +48,10 @@ export function mapPlayer(row: PlayerRow): Player {
   return {
     id: row.id,
     sessionId: row.session_id,
+    userId: row.user_id ?? undefined,
     name: row.name,
     contactNumber: row.contact_number ?? undefined,
+    gender: (row.gender as ProfileGender) ?? undefined,
     skillLevel: normalizePlayerSkill(row.skill_level),
     note: row.note ?? undefined,
     status: row.status as PlayerStatus,
@@ -98,6 +106,30 @@ export function mapActivity(row: ActivityRow): SessionActivity {
   };
 }
 
+export function mapActivityLog(row: ActivityLogRow): ActivityLog {
+  return {
+    id: row.id,
+    sessionId: row.session_id,
+    eventType: row.event_type as ActivityEventType,
+    title: row.title,
+    description: row.description,
+    metadata: (row.metadata as Record<string, unknown>) ?? {},
+    createdAt: row.created_at,
+  };
+}
+
+export function mapProfile(row: ProfileRow): UserProfile {
+  return {
+    id: row.id,
+    email: row.email,
+    fullName: row.full_name,
+    contactNumber: row.contact_number ?? undefined,
+    gender: row.gender as ProfileGender,
+    skillLevel: normalizePlayerSkill(row.skill_level),
+    createdAt: row.created_at,
+  };
+}
+
 export function mapSession(
   row: SessionRow,
   players: PlayerRow[] = []
@@ -115,7 +147,7 @@ export function mapSession(
     maxPlayers: row.max_players,
     status: computeSessionStatus(
       row.status,
-      mappedPlayers.length,
+      countAdmittedPlayers(mappedPlayers),
       row.max_players
     ),
     courtCount: row.court_count ?? 1,
@@ -139,9 +171,34 @@ export function getTodayDate(): string {
 }
 
 export function sortSessions(sessions: Session[]): Session[] {
-  return [...sessions].sort((a, b) =>
-    a.startTime.localeCompare(b.startTime)
-  );
+  return [...sessions].sort((a, b) => {
+    const byDate = a.date.localeCompare(b.date);
+    if (byDate !== 0) return byDate;
+    return a.startTime.localeCompare(b.startTime);
+  });
+}
+
+export function formatSessionDate(date: string): string {
+  const [year, month, day] = date.split("-").map(Number);
+  return new Date(year, month - 1, day).toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+export function formatSessionDateHeading(date: string): string {
+  const [year, month, day] = date.split("-").map(Number);
+  return new Date(year, month - 1, day).toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+export function isSessionPast(date: string): boolean {
+  return date < getTodayDate();
 }
 
 export function toSessionInsert(

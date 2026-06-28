@@ -18,6 +18,7 @@ import {
   getJoinedPlayerId,
 } from "@/hooks/use-player-profile";
 import { getQueuePosition, toQueuePlayer } from "@/lib/queue/queue-engine";
+import { getWaitlistPosition } from "@/lib/waitlist";
 import { createClient } from "@/utils/supabase/client";
 import { fetchSessionById } from "@/utils/supabase/queries";
 import type { Session } from "@/types";
@@ -67,12 +68,16 @@ function SessionStatusContent({ sessionId }: { sessionId: string }) {
   const myPlayerId = getJoinedPlayerId(sessionId);
   const myPlayer = session.players.find((p) => p.id === myPlayerId);
   const queuePlayers = session.players.map((p) => toQueuePlayer(p));
-  const queuePosition = myPlayer
-    ? getQueuePosition(queuePlayers, myPlayer.id, {
-        paymentRequired: session.paymentRequired,
-        allowUnpaidInQueue: session.allowUnpaidInQueue,
-        skillMatchingMode: session.skillMatchingMode,
-      })
+  const queuePosition =
+    myPlayer && myPlayer.status !== "Waitlisted"
+      ? getQueuePosition(queuePlayers, myPlayer.id, {
+          paymentRequired: session.paymentRequired,
+          allowUnpaidInQueue: session.allowUnpaidInQueue,
+          skillMatchingMode: session.skillMatchingMode,
+        })
+      : null;
+  const waitlistPosition = myPlayer
+    ? getWaitlistPosition(session.players, myPlayer.id)
     : null;
 
   return (
@@ -107,7 +112,7 @@ function SessionStatusContent({ sessionId }: { sessionId: string }) {
       {myPlayer ? (
         <Card className="rounded-3xl border-2 border-sisclub-green/30">
           <CardHeader>
-            <CardTitle>Your registration</CardTitle>
+            <CardTitle>Your spot</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
             <div className="flex items-center gap-2">
@@ -122,6 +127,16 @@ function SessionStatusContent({ sessionId }: { sessionId: string }) {
                 Queue position: #{queuePosition}
               </p>
             )}
+            {waitlistPosition && (
+              <p className="text-sm font-medium text-amber-800">
+                Waitlist position: #{waitlistPosition}
+              </p>
+            )}
+            {myPlayer.status === "Waitlisted" && (
+              <p className="text-sm text-muted-foreground">
+                You will be added automatically when a spot opens.
+              </p>
+            )}
             {myPlayer.status === "Registered" && session.paymentRequired && (
               <p className="text-sm text-amber-700">
                 Awaiting payment confirmation from organizer.
@@ -133,13 +148,13 @@ function SessionStatusContent({ sessionId }: { sessionId: string }) {
         <Card className="rounded-3xl border-2 border-dashed border-black/10">
           <CardContent className="py-8 text-center">
             <p className="mb-4 text-muted-foreground">
-              You are not registered for this session.
+              You have not joined this session yet.
             </p>
             <Link
               href={`/join?sessionId=${sessionId}`}
               className="inline-flex h-12 w-full items-center justify-center rounded-full bg-sisclub-green font-bold text-white hover:bg-sisclub-green-dark"
             >
-              Register now
+              {session.status === "full" ? "Join waitlist" : "Join now"}
             </Link>
           </CardContent>
         </Card>
@@ -150,10 +165,10 @@ function SessionStatusContent({ sessionId }: { sessionId: string }) {
       </Button>
 
       <Link
-        href={`/sessions/${sessionId}/courts`}
+        href={`/sessions/${sessionId}/live`}
         className="inline-flex h-12 w-full items-center justify-center rounded-full bg-sisclub-pink font-bold text-white hover:bg-sisclub-pink-dark"
       >
-        View Courts
+        Watch live
       </Link>
     </div>
   );

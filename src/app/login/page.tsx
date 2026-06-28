@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
@@ -15,6 +16,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { checkIsAdmin } from "@/utils/supabase/queries";
 import { createClient } from "@/utils/supabase/client";
 
 function LoginForm() {
@@ -50,7 +52,15 @@ function LoginForm() {
         return;
       }
 
-      router.push(redirect);
+      const isAdmin = await checkIsAdmin(supabase);
+      if (!isAdmin) {
+        await supabase.auth.signOut();
+        toast.error("Admin access only");
+        setIsSubmitting(false);
+        return;
+      }
+
+      router.push(redirect.startsWith("/admin") ? redirect : "/admin");
       router.refresh();
     } catch {
       toast.error("Login failed. Please try again.");
@@ -67,10 +77,10 @@ function LoginForm() {
               <LogIn className="h-6 w-6 text-sisclub-green" />
             </div>
             <CardTitle className="font-heading text-2xl text-sisclub-green-dark">
-              Organizer Login
+              Admin Login
             </CardTitle>
             <CardDescription>
-              Sign in with your admin account to manage sessions.
+              Organizer sign-in only. Players join open play without an account.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -85,7 +95,7 @@ function LoginForm() {
                 <Input
                   id="email"
                   type="email"
-                  placeholder="organizer@sisclub.ph"
+                  placeholder="admin@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="h-12 rounded-2xl border-2 border-black/10"
@@ -123,6 +133,15 @@ function LoginForm() {
                 )}
               </Button>
             </form>
+
+            <p className="mt-6 text-center text-sm text-muted-foreground">
+              <Link
+                href="/dashboard"
+                className="font-semibold text-sisclub-green underline-offset-2 hover:underline"
+              >
+                Back to open play
+              </Link>
+            </p>
           </CardContent>
         </Card>
       </div>

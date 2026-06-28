@@ -2,8 +2,20 @@ import type { PlayerStatus } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
+const statusLabels: Record<PlayerStatus, string> = {
+  Registered: "Joined",
+  Waitlisted: "Waitlisted",
+  Secured: "Secured",
+  Present: "Present",
+  Waiting: "Waiting",
+  Playing: "Playing",
+  Finished: "Finished",
+  "No Show": "No Show",
+};
+
 const statusStyles: Record<PlayerStatus, string> = {
   Registered: "bg-slate-100 text-slate-700 border-slate-200",
+  Waitlisted: "bg-orange-50 text-orange-800 border-orange-200",
   Secured: "bg-emerald-50 text-emerald-700 border-emerald-200",
   Present: "bg-sisclub-green/15 text-sisclub-green border-sisclub-green/30",
   Waiting: "bg-amber-50 text-amber-700 border-amber-200",
@@ -21,7 +33,7 @@ export function PlayerStatusBadge({ status }: { status: PlayerStatus }) {
         statusStyles[status]
       )}
     >
-      {status}
+      {statusLabels[status]}
     </Badge>
   );
 }
