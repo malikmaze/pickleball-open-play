@@ -1,11 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import { Loader2, RefreshCw } from "lucide-react";
+import { Loader2, Plus, RefreshCw } from "lucide-react";
 import { AppHeader } from "@/components/app-header";
+import { AddPlayerDialog } from "@/components/admin/add-player-dialog";
+import { PlayerRoster } from "@/components/admin/player-roster";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { PlayerStatusBadge } from "@/components/player-status-badge";
 import { SessionAdminTabs } from "@/components/admin/session-tabs";
 import {
@@ -25,17 +28,10 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { PLAYER_SKILL_LEVELS } from "@/lib/constants";
-import {
   getEligiblePlayers,
   toQueuePlayer,
 } from "@/lib/queue/queue-engine";
+import { formatSessionDate } from "@/lib/sessions";
 import {
   countAdmittedPlayers,
   getWaitlistedPlayers,
@@ -50,12 +46,12 @@ import {
   markPlayerNoShow,
   markPlayerPresent,
   markPlayerSecured,
+  markPlayersPresentBulk,
   processWaitlistPromotions,
   updatePlayerRecord,
   updateSessionRecord,
 } from "@/utils/supabase/queries";
-import type { Player, PlayerSkillLevel, Session, SessionBundle } from "@/types";
-import { Suspense } from "react";
+import type { Player, PlayerSkillLevel, SessionBundle } from "@/types";
 
 function SessionAdminContent({ sessionId }: { sessionId: string }) {
   const searchParams = useSearchParams();
@@ -65,46 +61,32 @@ function SessionAdminContent({ sessionId }: { sessionId: string }) {
   const [saving, setSaving] = useState(false);
   const [settingsForm, setSettingsForm] = useState<SessionFormValues | null>(null);
   const [addingTestPlayers, setAddingTestPlayers] = useState(false);
+  const [addPlayerOpen, setAddPlayerOpen] = useState(false);
+  const [removeTarget, setRemoveTarget] = useState<string | null>(null);
+  const [removeLoading, setRemoveLoading] = useState(false);
+  const [bulkLoading, setBulkLoading] = useState(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const supabase = createClient();
       const data = await fetchSessionBundle(supabase, sessionId);
       setBundle(data);
       if (data) setSettingsForm(sessionToFormValues(data.session));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to load session");
+      if (!silent) {
+        toast.error(err instanceof Error ? err.message : "Failed to load session");
+      }
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [sessionId]);
 
   useEffect(() => {
-    let cancelled = false;
-
-    (async () => {
-      setLoading(true);
-      try {
-        const supabase = createClient();
-        const data = await fetchSessionBundle(supabase, sessionId);
-        if (!cancelled) {
-          setBundle(data);
-          if (data) setSettingsForm(sessionToFormValues(data.session));
-        }
-      } catch (err) {
-        if (!cancelled) {
-          toast.error(err instanceof Error ? err.message : "Failed to load session");
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [sessionId]);
+    void load();
+    const interval = setInterval(() => void load(true), 15000);
+    return () => clearInterval(interval);
+  }, [load]);
 
   const session = bundle?.session;
 
@@ -116,7 +98,7 @@ function SessionAdminContent({ sessionId }: { sessionId: string }) {
     try {
       if (action === "present") await markPlayerPresent(supabase, playerId);
       if (action === "secured") await markPlayerSecured(supabase, playerId);
-      if (action === "noshow") await markPlayerNoShow(supabase, playerId);
+      if (action === "noshow") await markPlayerNoShow(supabase, playerId, sessionId);
       toast.success("Player updated");
       await load();
     } catch (err) {
@@ -125,6 +107,7 @@ function SessionAdminContent({ sessionId }: { sessionId: string }) {
   };
 
   const handleRemovePlayer = async (playerId: string) => {
+    setRemoveLoading(true);
     const supabase = createClient();
     try {
       await deletePlayerRecord(supabase, playerId);
@@ -136,9 +119,26 @@ function SessionAdminContent({ sessionId }: { sessionId: string }) {
       } else {
         toast.success("Player removed");
       }
+      setRemoveTarget(null);
       await load();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Remove failed");
+    } finally {
+      setRemoveLoading(false);
+    }
+  };
+
+  const handleBulkPresent = async (playerIds: string[]) => {
+    setBulkLoading(true);
+    const supabase = createClient();
+    try {
+      const count = await markPlayersPresentBulk(supabase, sessionId, playerIds);
+      toast.success(`Checked in ${count} player${count === 1 ? "" : "s"}`);
+      await load();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Bulk check-in failed");
+    } finally {
+      setBulkLoading(false);
     }
   };
 
@@ -226,17 +226,26 @@ function SessionAdminContent({ sessionId }: { sessionId: string }) {
             {session.title}
           </h2>
           <p className="text-sm text-muted-foreground">
-            {session.startTime} – {session.endTime} · {session.location}
+            {formatSessionDate(session.date)} · {session.startTime} –{" "}
+            {session.endTime} · {session.location}
           </p>
         </div>
-        <Button
-          variant="outline"
-          onClick={() => load()}
-          className="rounded-full border-2 border-black/10"
-        >
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href={`/sessions/${sessionId}/live`}
+            className="inline-flex h-9 items-center rounded-full border-2 border-black/10 px-3 text-sm font-medium hover:bg-sisclub-pink-soft"
+          >
+            Public live
+          </Link>
+          <Button
+            variant="outline"
+            onClick={() => load()}
+            className="rounded-full border-2 border-black/10"
+          >
           <RefreshCw className="mr-1 h-4 w-4" />
-          Refresh
-        </Button>
+            Refresh
+          </Button>
+        </div>
       </div>
 
       <SessionAdminTabs sessionId={sessionId} />
@@ -253,7 +262,10 @@ function SessionAdminContent({ sessionId }: { sessionId: string }) {
                 {session.maxPlayers}
               </p>
               <p>Waitlist: {getWaitlistedPlayers(session.players).length}</p>
-              <p>Present: {session.players.filter((p) => p.status === "Present" || p.status === "Waiting").length}</p>
+              <p>
+                Checked in:{" "}
+                {session.players.filter((p) => p.status === "Present").length}
+              </p>
               <p>In queue: {eligible.length}</p>
               <p>Playing: {session.players.filter((p) => p.status === "Playing").length}</p>
               <p>Courts: {session.courtCount}</p>
@@ -287,27 +299,22 @@ function SessionAdminContent({ sessionId }: { sessionId: string }) {
         <>
           <div className="mb-4 flex flex-wrap gap-2">
             <Button
-              variant="outline"
-              onClick={handleAddTestPlayers}
-              disabled={addingTestPlayers}
-              className="rounded-full border-2 border-amber-300/60 text-amber-900 hover:bg-amber-50"
+              onClick={() => setAddPlayerOpen(true)}
+              className="rounded-full bg-sisclub-green font-semibold hover:bg-sisclub-green-dark"
             >
-              {addingTestPlayers ? (
-                <Loader2 className="mr-1 h-4 w-4 animate-spin" />
-              ) : null}
-              Add test players
+              <Plus className="mr-1 h-4 w-4" />
+              Add walk-in
             </Button>
-            <p className="flex items-center text-xs text-muted-foreground">
-              Loads roster from backend templates (skips duplicates)
-            </p>
           </div>
-          <PlayerList
+          <PlayerRoster
             players={session.players.filter((p) => isAdmittedPlayer(p.status))}
-            mode={tab}
+            mode={tab === "checkin" ? "checkin" : "registrations"}
             session={session}
             onStatus={handlePlayerStatus}
-            onRemove={handleRemovePlayer}
+            onRemove={(id) => setRemoveTarget(id)}
             onSkillChange={handleSkillChange}
+            onBulkPresent={tab === "checkin" ? handleBulkPresent : undefined}
+            bulkLoading={bulkLoading}
           />
           {tab === "registrations" && (
             <WaitlistPanel
@@ -315,7 +322,7 @@ function SessionAdminContent({ sessionId }: { sessionId: string }) {
               admittedCount={countAdmittedPlayers(session.players)}
               maxPlayers={session.maxPlayers}
               onAdmit={handleAdmitWaitlisted}
-              onRemove={handleRemovePlayer}
+              onRemove={(id) => setRemoveTarget(id)}
             />
           )}
         </>
@@ -353,7 +360,7 @@ function SessionAdminContent({ sessionId }: { sessionId: string }) {
                       size="sm"
                       variant="destructive"
                       className="rounded-full"
-                      onClick={() => handleRemovePlayer(p.id)}
+                      onClick={() => setRemoveTarget(p.id)}
                     >
                       Remove
                     </Button>
@@ -372,6 +379,20 @@ function SessionAdminContent({ sessionId }: { sessionId: string }) {
 
       {tab === "settings" && settingsForm && (
         <form onSubmit={handleSaveSettings} className="space-y-4">
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleAddTestPlayers}
+              disabled={addingTestPlayers}
+              className="rounded-full border-2 border-amber-300/60 text-amber-900 hover:bg-amber-50"
+            >
+              {addingTestPlayers ? (
+                <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+              ) : null}
+              Add test players (demo)
+            </Button>
+          </div>
           <SessionForm
             values={settingsForm}
             onChange={setSettingsForm}
@@ -385,6 +406,24 @@ function SessionAdminContent({ sessionId }: { sessionId: string }) {
           </Button>
         </form>
       )}
+
+      <AddPlayerDialog
+        open={addPlayerOpen}
+        onOpenChange={setAddPlayerOpen}
+        sessionId={sessionId}
+        onAdded={() => load(true)}
+      />
+
+      <ConfirmDialog
+        open={!!removeTarget}
+        onOpenChange={(open) => !open && setRemoveTarget(null)}
+        title="Remove player?"
+        description="This removes them from the session. Waitlisted players may be auto-admitted if a spot opens."
+        confirmLabel="Remove"
+        variant="destructive"
+        onConfirm={() => removeTarget && handleRemovePlayer(removeTarget)}
+        isLoading={removeLoading}
+      />
     </>
   );
 }
@@ -454,91 +493,6 @@ function WaitlistPanel({
             </CardContent>
           </Card>
         ))
-      )}
-    </div>
-  );
-}
-
-function PlayerList({
-  players,
-  mode,
-  session,
-  onStatus,
-  onRemove,
-  onSkillChange,
-}: {
-  players: Player[];
-  mode: string;
-  session: Session;
-  onStatus: (id: string, action: "present" | "secured" | "noshow") => void;
-  onRemove: (id: string) => void;
-  onSkillChange: (id: string, skill: PlayerSkillLevel) => void;
-}) {
-  return (
-    <div className="space-y-3">
-      {players.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No one has joined yet.</p>
-      ) : (
-        players.map((player) => {
-          const waitLabel = player.checkedInAt
-            ? `checked in ${new Date(player.checkedInAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`
-            : `joined ${new Date(player.joinedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`;
-
-          return (
-            <Card key={player.id} className="rounded-2xl border-2 border-black/10">
-              <CardContent className="space-y-3 pt-4">
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div>
-                    <p className="font-semibold text-sisclub-green-dark">{player.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {player.contactNumber || "No contact"} · {player.gamesPlayed} games · {waitLabel}
-                    </p>
-                    {player.note && (
-                      <p className="mt-1 text-xs italic text-muted-foreground">{player.note}</p>
-                    )}
-                  </div>
-                  <PlayerStatusBadge status={player.status} />
-                </div>
-                {mode === "checkin" && (
-                  <div className="flex flex-wrap gap-2">
-                    <Button size="sm" variant="outline" className="rounded-full" onClick={() => onStatus(player.id, "present")}>
-                      Present
-                    </Button>
-                    {session.paymentRequired && (
-                      <Button size="sm" variant="outline" className="rounded-full" onClick={() => onStatus(player.id, "secured")}>
-                        Secured
-                      </Button>
-                    )}
-                    <Button size="sm" variant="outline" className="rounded-full" onClick={() => onStatus(player.id, "noshow")}>
-                      No Show
-                    </Button>
-                    <Select
-                      value={player.skillLevel}
-                      onValueChange={(v) => onSkillChange(player.id, v as PlayerSkillLevel)}
-                    >
-                      <SelectTrigger className="h-8 w-40 rounded-full"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {PLAYER_SKILL_LEVELS.map((l) => (
-                          <SelectItem key={l} value={l}>{l}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Button size="sm" variant="destructive" className="rounded-full" onClick={() => onRemove(player.id)}>
-                      Remove
-                    </Button>
-                  </div>
-                )}
-                {mode === "registrations" && (
-                  <div className="flex flex-wrap gap-2">
-                    <Button size="sm" variant="destructive" className="rounded-full" onClick={() => onRemove(player.id)}>
-                      Remove from session
-                    </Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          );
-        })
       )}
     </div>
   );

@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { BottomNav } from "@/components/bottom-nav";
 import { DesktopNav } from "@/components/desktop-nav";
 import { cn } from "@/lib/utils";
@@ -15,7 +16,11 @@ export function PageShell({
 }: PageShellProps) {
   return (
     <div className="halftone-bg min-h-screen">
-      <DesktopNav />
+      {withNav && (
+        <Suspense fallback={null}>
+          <DesktopNav />
+        </Suspense>
+      )}
       <main
         className={cn(
           "mx-auto min-h-screen max-w-3xl px-4",
@@ -25,7 +30,11 @@ export function PageShell({
       >
         {children}
       </main>
-      {withNav && <BottomNav />}
+      {withNav && (
+        <Suspense fallback={null}>
+          <BottomNav />
+        </Suspense>
+      )}
     </div>
   );
 }
