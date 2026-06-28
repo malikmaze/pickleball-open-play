@@ -40,6 +40,7 @@ import {
   sessionFormToPayload,
   sessionToFormValues,
 } from "@/components/admin/session-form";
+import { formatSessionCourtsLabel } from "@/lib/court-schedule";
 import { defaultSessionFields, formatSessionDate } from "@/lib/sessions";
 import {
   countAdmittedPlayers,
@@ -51,6 +52,7 @@ import {
   clearSessionPlayersRecord,
   createSessionRecord,
   deleteSessionRecord,
+  fetchSessionBundle,
   toggleSessionClosedRecord,
   updateSessionRecord,
   type SessionListScope,
@@ -84,10 +86,19 @@ export default function AdminPage() {
     setFormOpen(true);
   };
 
-  const openEdit = (session: Session) => {
+  const openEdit = async (session: Session) => {
     setEditingId(session.id);
     setForm(sessionToFormValues(session));
     setFormOpen(true);
+    try {
+      const supabase = createClient();
+      const bundle = await fetchSessionBundle(supabase, session.id);
+      if (bundle) {
+        setForm(sessionToFormValues(bundle.session, bundle.courts));
+      }
+    } catch {
+      // Keep basic session fields if courts fail to load
+    }
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -102,15 +113,19 @@ export default function AdminPage() {
     const supabase = createClient();
 
     try {
-      const payload = sessionFormToPayload(form);
+      const { session: payload, courtSchedules } = sessionFormToPayload(form);
       if (editingId) {
-        await updateSessionRecord(supabase, editingId, payload);
+        await updateSessionRecord(supabase, editingId, payload, courtSchedules);
         toast.success("Session updated");
       } else {
-        await createSessionRecord(supabase, {
-          ...defaultSessionFields(),
-          ...payload,
-        });
+        await createSessionRecord(
+          supabase,
+          {
+            ...defaultSessionFields(),
+            ...payload,
+          },
+          courtSchedules
+        );
         toast.success("Session created");
       }
 
@@ -208,7 +223,7 @@ export default function AdminPage() {
 
   return (
     <PageShell size="wide">
-      <AppHeader subtitle="Admin dashboard" size="wide" />
+      <AppHeader subtitle="Admin dashboard" />
 
       <div className="py-4 sm:py-6">
         <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -332,7 +347,8 @@ export default function AdminPage() {
                       </CardTitle>
                       <CardDescription className="mt-1 break-words">
                         {formatSessionDate(session.date)} · {session.startTime}{" "}
-                        – {session.endTime} · {session.courtNumber}
+                        – {session.endTime} ·{" "}
+                        {formatSessionCourtsLabel(session.courtCount)}
                       </CardDescription>
                     </div>
                     <div className="flex gap-1.5">

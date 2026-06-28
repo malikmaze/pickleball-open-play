@@ -123,6 +123,8 @@ export interface Court {
   sidesSwapped: boolean;
   sideChangeCount: number;
   lastSideChangeAt?: string;
+  rentalStartTime?: string;
+  rentalEndTime?: string;
   createdAt: string;
 }
 

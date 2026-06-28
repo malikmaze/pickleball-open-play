@@ -15,6 +15,10 @@ import {
   getQueueSessionSettings,
 } from "@/lib/sessions";
 import {
+  type CourtScheduleEntry,
+  isCourtRentalActive,
+} from "@/lib/court-schedule";
+import {
   normalizePhilippineMobile,
   parsePhilippineMobile,
   PH_MOBILE_ERROR,
@@ -237,9 +241,50 @@ export async function syncCourtsForSession(
   return (refreshed ?? []).map(mapCourt);
 }
 
+export async function syncCourtRentalTimes(
+  supabase: Client,
+  sessionId: string,
+  courtSchedules: CourtScheduleEntry[] | null
+): Promise<void> {
+  const { data: courts, error } = await supabase
+    .from("courts")
+    .select("id, court_number")
+    .eq("session_id", sessionId)
+    .order("court_number", { ascending: true });
+  if (error) throw error;
+
+  for (const court of courts ?? []) {
+    const schedule = courtSchedules?.find(
+      (entry) => entry.courtNumber === court.court_number
+    );
+    const payload =
+      courtSchedules === null
+        ? {
+            rental_start_time: null,
+            rental_end_time: null,
+          }
+        : schedule
+          ? {
+              rental_start_time: schedule.startTime,
+              rental_end_time: schedule.endTime,
+            }
+          : {
+              rental_start_time: null,
+              rental_end_time: null,
+            };
+
+    const { error: updateError } = await supabase
+      .from("courts")
+      .update(payload)
+      .eq("id", court.id);
+    if (updateError) throw updateError;
+  }
+}
+
 export async function createSessionRecord(
   supabase: Client,
-  session: Omit<Session, "id" | "status" | "players">
+  session: Omit<Session, "id" | "status" | "players">,
+  courtSchedules?: CourtScheduleEntry[] | null
 ): Promise<Session> {
   const defaults = defaultSessionFields();
   const { data, error } = await supabase
@@ -254,13 +299,17 @@ export async function createSessionRecord(
     .single();
   if (error) throw error;
   await syncCourtsForSession(supabase, data.id, data.court_count ?? 1);
+  if (courtSchedules !== undefined) {
+    await syncCourtRentalTimes(supabase, data.id, courtSchedules);
+  }
   return mapSession(data, []);
 }
 
 export async function updateSessionRecord(
   supabase: Client,
   sessionId: string,
-  updates: Partial<Omit<Session, "id" | "players">>
+  updates: Partial<Omit<Session, "id" | "players">>,
+  courtSchedules?: CourtScheduleEntry[] | null
 ): Promise<void> {
   const { error } = await supabase
     .from("sessions")
@@ -272,6 +321,9 @@ export async function updateSessionRecord(
   }
   if (updates.maxPlayers !== undefined) {
     await processWaitlistPromotions(supabase, sessionId);
+  }
+  if (courtSchedules !== undefined) {
+    await syncCourtRentalTimes(supabase, sessionId, courtSchedules);
   }
 }
 
@@ -639,6 +691,22 @@ export async function assignNextMatchToCourtRecord(
   session: Session,
   courtId: string
 ): Promise<Match | null> {
+  const { data: courtRow, error: courtError } = await supabase
+    .from("courts")
+    .select("*")
+    .eq("id", courtId)
+    .single();
+  if (courtError) throw courtError;
+  if (
+    !isCourtRentalActive(mapCourt(courtRow), {
+      date: session.date,
+      startTime: session.startTime,
+      endTime: session.endTime,
+    })
+  ) {
+    return null;
+  }
+
   const assignment = createNextMatchForCourt(
     session.players.map((p) => toQueuePlayer(p)),
     sessionQueueSettings(session)

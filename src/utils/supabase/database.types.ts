@@ -153,10 +153,12 @@ export type Database = {
         Row: {
           id: string;
           session_id: string;
-          court_number: number;
-          status: string;
-          created_at: string;
-          sides_swapped: boolean;
+      court_number: number;
+      status: string;
+      created_at: string;
+      rental_start_time: string | null;
+      rental_end_time: string | null;
+      sides_swapped: boolean;
           side_change_count: number;
           last_side_change_at: string | null;
         };
@@ -166,6 +168,8 @@ export type Database = {
           court_number: number;
           status?: string;
           created_at?: string;
+          rental_start_time?: string | null;
+          rental_end_time?: string | null;
           sides_swapped?: boolean;
           side_change_count?: number;
           last_side_change_at?: string | null;
@@ -176,6 +180,8 @@ export type Database = {
           court_number?: number;
           status?: string;
           created_at?: string;
+          rental_start_time?: string | null;
+          rental_end_time?: string | null;
           sides_swapped?: boolean;
           side_change_count?: number;
           last_side_change_at?: string | null;

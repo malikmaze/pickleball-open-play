@@ -23,11 +23,25 @@ import {
   SKILL_MATCHING_MODES,
 } from "@/lib/constants";
 import {
+  type CourtScheduleEntry,
+  courtSchedulesFromCourts,
+  courtsUseSessionRentalTime,
+  syncCourtScheduleCount,
+  validateCourtSchedules,
+} from "@/lib/court-schedule";
+import { IntegerInput } from "@/components/integer-input";
+import {
+  clampPaymentAmount,
+  clampSessionCourtCount,
   clampSessionMaxPlayers,
+  clampSideChangePoint,
+  clampTargetScore,
+  clampWinBy,
   MIN_SESSION_PLAYERS,
-  sanitizeIntegerTyping,
+  parsePaymentAmountInput,
+  sanitizeDecimalTyping,
 } from "@/lib/numbers";
-import type { SessionSkillLevel, SkillMatchingMode } from "@/types";
+import type { Court, SessionSkillLevel, SkillMatchingMode } from "@/types";
 import { cn } from "@/lib/utils";
 
 export interface SessionFormValues {
@@ -36,10 +50,11 @@ export interface SessionFormValues {
   startTime: string;
   endTime: string;
   location: string;
-  courtNumber: string;
   skillLevel: SessionSkillLevel;
   maxPlayers: number;
   courtCount: number;
+  courtsUseSessionTime: boolean;
+  courtSchedules: CourtScheduleEntry[];
   targetScore: number;
   winBy: number;
   paymentRequired: boolean;
@@ -60,10 +75,13 @@ export function emptySessionForm(): SessionFormValues {
     startTime: "08:00",
     endTime: "10:00",
     location: "SisClub Courts",
-    courtNumber: "Court 1",
     skillLevel: "Mixed",
     maxPlayers: 8,
     courtCount: 1,
+    courtsUseSessionTime: true,
+    courtSchedules: [
+      { courtNumber: 1, startTime: "08:00", endTime: "10:00" },
+    ],
     targetScore: 15,
     winBy: 2,
     paymentRequired: false,
@@ -126,7 +144,9 @@ export function SessionForm({
         <Card className="rounded-3xl border-2 border-black/10">
           <CardHeader className="pb-3">
             <CardTitle className="text-base">Basic Details</CardTitle>
-            <CardDescription>Session title, schedule, and capacity</CardDescription>
+            <CardDescription>
+              Session info and the overall schedule shown to players
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="space-y-2">
@@ -154,35 +174,14 @@ export function SessionForm({
               </div>
               <div className="space-y-2">
                 <Label htmlFor="maxPlayers">Max players</Label>
-                <Input
+                <IntegerInput
                   id="maxPlayers"
-                  type="text"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
+                  value={values.maxPlayers}
+                  onChange={(v) => set("maxPlayers", v)}
                   min={MIN_SESSION_PLAYERS}
                   max={MAX_SESSION_PLAYERS}
-                  value={
-                    values.maxPlayers > 0 ? String(values.maxPlayers) : ""
-                  }
-                  onChange={(e) => {
-                    const sanitized = sanitizeIntegerTyping(e.target.value, 3);
-                    if (sanitized === "") {
-                      set("maxPlayers", 0);
-                      return;
-                    }
-                    const parsed = parseInt(sanitized, 10);
-                    set(
-                      "maxPlayers",
-                      Number.isNaN(parsed) ? 0 : parsed
-                    );
-                  }}
-                  onBlur={() => {
-                    set(
-                      "maxPlayers",
-                      clampSessionMaxPlayers(values.maxPlayers)
-                    );
-                  }}
-                  className="rounded-2xl border-2 border-black/10"
+                  maxDigits={3}
+                  fallback={8}
                   required
                 />
                 <p className="text-xs text-muted-foreground">
@@ -197,7 +196,21 @@ export function SessionForm({
                   id="startTime"
                   type="time"
                   value={values.startTime}
-                  onChange={(e) => set("startTime", e.target.value)}
+                  onChange={(e) => {
+                    const startTime = e.target.value;
+                    onChange({
+                      ...values,
+                      startTime,
+                      courtSchedules: values.courtsUseSessionTime
+                        ? syncCourtScheduleCount(
+                            values.courtSchedules,
+                            values.courtCount,
+                            startTime,
+                            values.endTime
+                          )
+                        : values.courtSchedules,
+                    });
+                  }}
                   className="rounded-2xl border-2 border-black/10"
                   required
                 />
@@ -208,10 +221,28 @@ export function SessionForm({
                   id="endTime"
                   type="time"
                   value={values.endTime}
-                  onChange={(e) => set("endTime", e.target.value)}
+                  onChange={(e) => {
+                    const endTime = e.target.value;
+                    onChange({
+                      ...values,
+                      endTime,
+                      courtSchedules: values.courtsUseSessionTime
+                        ? syncCourtScheduleCount(
+                            values.courtSchedules,
+                            values.courtCount,
+                            values.startTime,
+                            endTime
+                          )
+                        : values.courtSchedules,
+                    });
+                  }}
                   className="rounded-2xl border-2 border-black/10"
                   required
                 />
+                <p className="text-xs text-muted-foreground">
+                  Default window for the session. Per-court rental times can differ
+                  in Court Settings.
+                </p>
               </div>
             </div>
             <div className="space-y-2">
@@ -224,34 +255,23 @@ export function SessionForm({
                 required
               />
             </div>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="court">Court label</Label>
-                <Input
-                  id="court"
-                  value={values.courtNumber}
-                  onChange={(e) => set("courtNumber", e.target.value)}
-                  className="rounded-2xl border-2 border-black/10"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Session skill</Label>
-                <Select
-                  value={values.skillLevel}
-                  onValueChange={(v) => set("skillLevel", v as SessionSkillLevel)}
-                >
-                  <SelectTrigger className="rounded-2xl border-2 border-black/10">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {SESSION_SKILL_LEVELS.map((level) => (
-                      <SelectItem key={level} value={level}>
-                        {level}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="space-y-2">
+              <Label>Session skill</Label>
+              <Select
+                value={values.skillLevel}
+                onValueChange={(v) => set("skillLevel", v as SessionSkillLevel)}
+              >
+                <SelectTrigger className="rounded-2xl border-2 border-black/10">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {SESSION_SKILL_LEVELS.map((level) => (
+                    <SelectItem key={level} value={level}>
+                      {level}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </CardContent>
         </Card>
@@ -291,11 +311,21 @@ export function SessionForm({
             <div className="space-y-2">
               <Label>Payment amount</Label>
               <Input
-                type="number"
-                step="0.01"
-                min={0}
+                type="text"
+                inputMode="decimal"
                 value={values.paymentAmount}
-                onChange={(e) => set("paymentAmount", e.target.value)}
+                onChange={(e) =>
+                  set("paymentAmount", sanitizeDecimalTyping(e.target.value))
+                }
+                onBlur={() => {
+                  const parsed = parsePaymentAmountInput(values.paymentAmount);
+                  if (parsed != null) {
+                    set(
+                      "paymentAmount",
+                      String(clampPaymentAmount(parsed))
+                    );
+                  }
+                }}
                 placeholder="0.00"
                 className="rounded-2xl border-2 border-black/10"
                 disabled={!values.paymentRequired}
@@ -336,32 +366,35 @@ export function SessionForm({
           <div className="grid gap-3 sm:grid-cols-3">
             <div className="space-y-2">
               <Label>Target score</Label>
-              <Input
-                type="number"
-                min={1}
+              <IntegerInput
                 value={values.targetScore}
-                onChange={(e) => set("targetScore", Number(e.target.value))}
-                className="rounded-2xl border-2 border-black/10"
+                onChange={(v) => set("targetScore", v)}
+                min={1}
+                max={99}
+                maxDigits={2}
+                fallback={15}
               />
             </div>
             <div className="space-y-2">
               <Label>Win by</Label>
-              <Input
-                type="number"
-                min={1}
+              <IntegerInput
                 value={values.winBy}
-                onChange={(e) => set("winBy", Number(e.target.value))}
-                className="rounded-2xl border-2 border-black/10"
+                onChange={(v) => set("winBy", v)}
+                min={1}
+                max={20}
+                maxDigits={2}
+                fallback={2}
               />
             </div>
             <div className="space-y-2">
               <Label>Side change at</Label>
-              <Input
-                type="number"
-                min={1}
+              <IntegerInput
                 value={values.sideChangePoint}
-                onChange={(e) => set("sideChangePoint", Number(e.target.value))}
-                className="rounded-2xl border-2 border-black/10"
+                onChange={(v) => set("sideChangePoint", v)}
+                min={1}
+                max={Math.max(1, values.targetScore - 1)}
+                maxDigits={2}
+                fallback={8}
                 disabled={!values.allowSideChange}
               />
             </div>
@@ -378,20 +411,115 @@ export function SessionForm({
       <Card className="rounded-3xl border-2 border-black/10">
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Court Settings</CardTitle>
-          <CardDescription>How many courts run for this session</CardDescription>
+          <CardDescription>
+            Live queue courts for matches. These are separate from the session
+            location label above.
+          </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label>Number of courts</Label>
-            <Input
-              type="number"
+            <IntegerInput
+              value={values.courtCount}
+              onChange={(v) =>
+                onChange({
+                  ...values,
+                  courtCount: v,
+                  courtSchedules: syncCourtScheduleCount(
+                    values.courtSchedules,
+                    clampSessionCourtCount(v),
+                    values.startTime,
+                    values.endTime
+                  ),
+                })
+              }
               min={1}
               max={12}
-              value={values.courtCount}
-              onChange={(e) => set("courtCount", Number(e.target.value))}
-              className="rounded-2xl border-2 border-black/10"
+              maxDigits={2}
+              fallback={1}
             />
+            <p className="text-xs text-muted-foreground">
+              Creates Court 1, Court 2, … for the live queue and match
+              assignment.
+            </p>
           </div>
+
+          <CheckboxField
+            id="courtsUseSessionTime"
+            label="All courts use the session start/end time"
+            checked={values.courtsUseSessionTime}
+            onChange={(checked) =>
+              onChange({
+                ...values,
+                courtsUseSessionTime: checked,
+                courtSchedules: checked
+                  ? syncCourtScheduleCount(
+                      values.courtSchedules,
+                      values.courtCount,
+                      values.startTime,
+                      values.endTime
+                    )
+                  : syncCourtScheduleCount(
+                      [],
+                      values.courtCount,
+                      values.startTime,
+                      values.endTime
+                    ),
+              })
+            }
+          />
+
+          {!values.courtsUseSessionTime && (
+            <div className="space-y-3 rounded-2xl border-2 border-black/5 bg-white/60 p-3">
+              <p className="text-xs font-medium text-muted-foreground">
+                Rental time per court
+              </p>
+              {values.courtSchedules.map((schedule, index) => (
+                <div
+                  key={schedule.courtNumber}
+                  className="grid grid-cols-1 gap-2 border-t border-black/5 pt-3 first:border-t-0 first:pt-0 sm:grid-cols-[5rem_1fr_1fr]"
+                >
+                  <p className="pt-2 text-sm font-semibold text-sisclub-green-dark">
+                    Court {schedule.courtNumber}
+                  </p>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Rental start</Label>
+                    <Input
+                      type="time"
+                      value={schedule.startTime}
+                      onChange={(e) => {
+                        const next = [...values.courtSchedules];
+                        next[index] = {
+                          ...schedule,
+                          startTime: e.target.value,
+                        };
+                        onChange({ ...values, courtSchedules: next });
+                      }}
+                      className="rounded-2xl border-2 border-black/10"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Rental end</Label>
+                    <Input
+                      type="time"
+                      value={schedule.endTime}
+                      onChange={(e) => {
+                        const next = [...values.courtSchedules];
+                        next[index] = {
+                          ...schedule,
+                          endTime: e.target.value,
+                        };
+                        onChange({ ...values, courtSchedules: next });
+                      }}
+                      className="rounded-2xl border-2 border-black/10"
+                      required
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -445,41 +573,70 @@ export function SessionForm({
   );
 }
 
+export type SessionFormSavePayload = ReturnType<typeof sessionFormToPayload>;
+
 export function sessionFormToPayload(values: SessionFormValues) {
+  const targetScore = clampTargetScore(values.targetScore);
+  const courtCount = clampSessionCourtCount(values.courtCount);
+  const courtSchedules = syncCourtScheduleCount(
+    values.courtSchedules,
+    courtCount,
+    values.startTime,
+    values.endTime
+  );
+  const scheduleError = validateCourtSchedules(
+    courtSchedules,
+    values.courtsUseSessionTime
+  );
+  if (scheduleError) {
+    throw new Error(scheduleError);
+  }
+
   return {
-    title: values.title.trim(),
-    date: values.date,
-    startTime: values.startTime,
-    endTime: values.endTime,
-    location: values.location.trim(),
-    courtNumber: values.courtNumber.trim(),
-    skillLevel: values.skillLevel,
-    maxPlayers: clampSessionMaxPlayers(values.maxPlayers),
-    courtCount: values.courtCount,
-    targetScore: values.targetScore,
-    winBy: values.winBy,
-    paymentRequired: values.paymentRequired,
-    paymentAmount:
-      values.paymentRequired && values.paymentAmount
-        ? Number(values.paymentAmount)
-        : undefined,
-    paymentNote:
-      values.paymentRequired ? values.paymentNote.trim() || undefined : undefined,
-    paymentInstructions:
-      values.paymentRequired
-        ? values.paymentInstructions.trim() || undefined
-        : undefined,
-    allowUnpaidInQueue: values.paymentRequired
-      ? values.allowUnpaidInQueue
-      : true,
-    autoAssignNextMatch: values.autoAssignNextMatch,
-    allowSideChange: values.allowSideChange,
-    sideChangePoint: values.sideChangePoint,
-    skillMatchingMode: values.skillMatchingMode,
+    session: {
+      title: values.title.trim(),
+      date: values.date,
+      startTime: values.startTime,
+      endTime: values.endTime,
+      location: values.location.trim(),
+      courtNumber: courtCount === 1 ? "1" : `1-${courtCount}`,
+      skillLevel: values.skillLevel,
+      maxPlayers: clampSessionMaxPlayers(values.maxPlayers),
+      courtCount,
+      targetScore,
+      winBy: clampWinBy(values.winBy),
+      paymentRequired: values.paymentRequired,
+      paymentAmount:
+        values.paymentRequired && values.paymentAmount
+          ? clampPaymentAmount(
+              parsePaymentAmountInput(values.paymentAmount) ?? 0
+            )
+          : undefined,
+      paymentNote:
+        values.paymentRequired
+          ? values.paymentNote.trim() || undefined
+          : undefined,
+      paymentInstructions:
+        values.paymentRequired
+          ? values.paymentInstructions.trim() || undefined
+          : undefined,
+      allowUnpaidInQueue: values.paymentRequired
+        ? values.allowUnpaidInQueue
+        : true,
+      autoAssignNextMatch: values.autoAssignNextMatch,
+      allowSideChange: values.allowSideChange,
+      sideChangePoint: clampSideChangePoint(
+        values.sideChangePoint,
+        targetScore
+      ),
+      skillMatchingMode: values.skillMatchingMode,
+    },
+    courtSchedules: values.courtsUseSessionTime ? null : courtSchedules,
   };
 }
 
-export function sessionToFormValues(session: {
+export function sessionToFormValues(
+  session: {
   title: string;
   date: string;
   startTime: string;
@@ -500,17 +657,28 @@ export function sessionToFormValues(session: {
   allowSideChange: boolean;
   sideChangePoint: number;
   skillMatchingMode: SkillMatchingMode;
-}): SessionFormValues {
+},
+  courts: Pick<Court, "courtNumber" | "rentalStartTime" | "rentalEndTime">[] = []
+): SessionFormValues {
+  const courtsUseSessionTime = courtsUseSessionRentalTime(courts);
+  const courtSchedules = courtSchedulesFromCourts(
+    courts,
+    session.courtCount,
+    session.startTime,
+    session.endTime
+  );
+
   return {
     title: session.title,
     date: session.date,
     startTime: session.startTime,
     endTime: session.endTime,
     location: session.location,
-    courtNumber: session.courtNumber,
     skillLevel: session.skillLevel,
     maxPlayers: session.maxPlayers,
     courtCount: session.courtCount,
+    courtsUseSessionTime,
+    courtSchedules,
     targetScore: session.targetScore,
     winBy: session.winBy,
     paymentRequired: session.paymentRequired,

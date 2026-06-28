@@ -5,12 +5,11 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { Loader2, Plus, RefreshCw } from "lucide-react";
-import { AppHeader } from "@/components/app-header";
+import { AdminSessionChrome } from "@/components/admin/session-chrome";
 import { AddPlayerDialog } from "@/components/admin/add-player-dialog";
 import { PlayerRoster } from "@/components/admin/player-roster";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { PlayerStatusBadge } from "@/components/player-status-badge";
-import { SessionAdminTabs } from "@/components/admin/session-tabs";
 import {
   SessionForm,
   sessionFormToPayload,
@@ -31,6 +30,7 @@ import {
   getEligiblePlayers,
   toQueuePlayer,
 } from "@/lib/queue/queue-engine";
+import { formatCourtRentalWindow } from "@/lib/court-schedule";
 import { FREE_SESSION_PAYMENT_NOTE } from "@/lib/constants";
 import { formatSessionDate, getQueueSessionSettings } from "@/lib/sessions";
 import {
@@ -73,7 +73,7 @@ function SessionAdminContent({ sessionId }: { sessionId: string }) {
       const supabase = createClient();
       const data = await fetchSessionBundle(supabase, sessionId);
       setBundle(data);
-      if (data) setSettingsForm(sessionToFormValues(data.session));
+      if (data) setSettingsForm(sessionToFormValues(data.session, data.courts));
     } catch (err) {
       if (!silent) {
         toast.error(err instanceof Error ? err.message : "Failed to load session");
@@ -175,7 +175,14 @@ function SessionAdminContent({ sessionId }: { sessionId: string }) {
     setSaving(true);
     const supabase = createClient();
     try {
-      await updateSessionRecord(supabase, sessionId, sessionFormToPayload(settingsForm));
+      const { session: payload, courtSchedules } =
+        sessionFormToPayload(settingsForm);
+      await updateSessionRecord(
+        supabase,
+        sessionId,
+        payload,
+        courtSchedules
+      );
       toast.success("Settings saved");
       await load();
     } catch (err) {
@@ -246,8 +253,6 @@ function SessionAdminContent({ sessionId }: { sessionId: string }) {
         </div>
       </div>
 
-      <SessionAdminTabs sessionId={sessionId} />
-
       {tab === "overview" && (
         <div className="grid gap-4 sm:grid-cols-2">
           <Card className="rounded-3xl border-2 border-black/10">
@@ -267,6 +272,15 @@ function SessionAdminContent({ sessionId }: { sessionId: string }) {
               <p>In queue: {eligible.length}</p>
               <p>Playing: {session.players.filter((p) => p.status === "Playing").length}</p>
               <p>Courts: {session.courtCount}</p>
+              {bundle?.courts.map((court) => {
+                const window = formatCourtRentalWindow(court, session);
+                if (!window) return null;
+                return (
+                  <p key={court.id} className="text-muted-foreground">
+                    Court {court.courtNumber}: {window}
+                  </p>
+                );
+              })}
               <SkillBadge level={session.skillLevel} />
             </CardContent>
           </Card>
@@ -519,8 +533,11 @@ export default function SessionAdminPage({
 
   return (
     <PageShell size="wide">
-      <AppHeader subtitle="Session management" backHref="/admin" size="wide" />
-      <div className="py-6">
+      <AdminSessionChrome
+        sessionId={sessionId}
+        subtitle="Session management"
+      />
+      <div className="py-4 sm:py-5">
         <Suspense fallback={<Loader2 className="mx-auto h-8 w-8 animate-spin text-sisclub-green" />}>
           <SessionAdminContent sessionId={sessionId} />
         </Suspense>

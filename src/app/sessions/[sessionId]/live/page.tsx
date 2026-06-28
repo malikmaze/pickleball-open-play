@@ -34,7 +34,7 @@ export default function LiveSessionPage({
 
   return (
     <PageShell size="wide">
-      <AppHeader subtitle="Live" backHref="/live" size="wide" />
+      <AppHeader subtitle="Live" backHref="/live" />
       <div className="py-4 sm:py-6">
         {sessionId ? (
           <Suspense

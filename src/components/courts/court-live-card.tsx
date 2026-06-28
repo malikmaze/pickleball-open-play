@@ -12,6 +12,12 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  courtRentalUnavailableCopy,
+  formatEffectiveCourtRentalWindow,
+  getCourtRentalStatus,
+} from "@/lib/court-schedule";
+import { sanitizeScoreTyping } from "@/lib/numbers";
 import { cn } from "@/lib/utils";
 import { getPlayerGender } from "@/lib/player-gender";
 import type { Court, Match, Player, Session } from "@/types";
@@ -62,6 +68,7 @@ export function CourtLiveCard({
   onEndMatch,
   onChangeSides,
   onClear,
+  now = new Date(),
 }: {
   court: Court;
   session: Session;
@@ -73,6 +80,7 @@ export function CourtLiveCard({
   scoreInput: { a: string; b: string };
   nextMatchPreview?: string;
   highlightPlayerId?: string;
+  now?: Date;
   onScoreChange: (a: string, b: string) => void;
   onAssign: () => void;
   onStart: () => void;
@@ -108,8 +116,24 @@ export function CourtLiveCard({
     Math.max(scoreA, scoreB) >= session.sideChangePoint &&
     !court.sidesSwapped;
 
+  const rentalStatus = getCourtRentalStatus(court, session, now);
+  const isRentalActive = rentalStatus.available;
+  const rentalWindow = formatEffectiveCourtRentalWindow(court, session);
+  const unavailableCopy = courtRentalUnavailableCopy(rentalStatus);
+  const canAssignOrStart = isRentalActive;
+  const showCompactUnavailable = !isRentalActive && !displayMatch;
+  const showAdminFooter =
+    isAdmin && (Boolean(match) || court.status !== "Empty" || isRentalActive);
+
   return (
-    <Card className="relative overflow-hidden rounded-3xl border-2 border-pink-200/60 bg-gradient-to-b from-white via-pink-50/30 to-violet-50/40 shadow-lg">
+    <Card
+      className={cn(
+        "relative flex h-full flex-col overflow-hidden rounded-3xl border-2 shadow-lg transition-opacity",
+        isRentalActive
+          ? "border-pink-200/60 bg-gradient-to-b from-white via-pink-50/30 to-violet-50/40"
+          : "border-muted/50 bg-muted/30"
+      )}
+    >
       <AnimatePresence>
         {winnerFlash && (
           <motion.div
@@ -132,29 +156,50 @@ export function CourtLiveCard({
         )}
       </AnimatePresence>
 
-      <CardHeader className="pb-2">
-        <div className="flex items-center justify-between gap-2">
-          <CardTitle className="font-heading text-lg text-pink-600">
-            Court {court.courtNumber} ♡
-          </CardTitle>
+      <CardHeader className="space-y-0 border-b border-black/5 pb-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <CardTitle
+              className={cn(
+                "font-heading text-lg leading-tight",
+                isRentalActive ? "text-pink-600" : "text-muted-foreground"
+              )}
+            >
+              Court {court.courtNumber} ♡
+            </CardTitle>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Rental {rentalWindow}
+            </p>
+          </div>
           <span
             className={cn(
-              "rounded-full px-2.5 py-0.5 text-xs font-semibold",
-              statusColors[court.status]
+              "shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold",
+              isRentalActive
+                ? statusColors[court.status]
+                : "bg-muted text-muted-foreground"
             )}
           >
-            {court.status}
+            {isRentalActive ? court.status : "Unavailable"}
           </span>
         </div>
         {finishedMatch?.winnerTeam && court.status === "Finished" && !winnerFlash && (
-          <p className="text-sm font-semibold text-sisclub-green">
+          <p className="mt-2 text-sm font-semibold text-sisclub-green">
             Winner: Team {finishedMatch.winnerTeam}
           </p>
         )}
       </CardHeader>
 
-      <CardContent className="space-y-3 p-4 pt-0">
-        {displayMatch ? (
+      <CardContent className="flex flex-1 flex-col space-y-3 p-4">
+        {showCompactUnavailable ? (
+          <div className="flex flex-1 flex-col items-center justify-center rounded-2xl border border-dashed border-muted-foreground/20 bg-muted/20 px-4 py-10 text-center">
+            <p className="font-heading text-base font-semibold text-muted-foreground">
+              {unavailableCopy}
+            </p>
+            <p className="mt-2 max-w-[16rem] text-xs leading-relaxed text-muted-foreground">
+              This court opens during its rental window above.
+            </p>
+          </div>
+        ) : displayMatch ? (
           <div className="space-y-3 rounded-2xl border border-pink-100/80 bg-gradient-to-br from-pink-50/50 to-violet-50/30 p-3">
             <CourtScoreboard
               teamAScore={scoreA}
@@ -182,18 +227,18 @@ export function CourtLiveCard({
             )}
           </div>
         ) : (
-          <div className="overflow-hidden rounded-2xl border-2 border-dashed border-sisclub-green/30">
+          <div className="flex flex-1 flex-col overflow-hidden rounded-2xl border-2 border-dashed border-sisclub-green/30">
             <PickleballCourtView
               teamA={[{ name: "—" }, { name: "—" }]}
               teamB={[{ name: "—" }, { name: "—" }]}
             />
-            <p className="py-3 text-center text-sm text-muted-foreground">
+            <p className="border-t border-sisclub-green/10 py-3 text-center text-sm text-muted-foreground">
               Waiting for next match
             </p>
           </div>
         )}
 
-        {nextMatchPreview && (
+        {nextMatchPreview && canAssignOrStart && (
           <div className="rounded-2xl bg-sisclub-pink-soft/40 px-3 py-2 text-xs">
             <p className="font-semibold text-sisclub-pink-dark">Next up</p>
             <p className="text-muted-foreground">{nextMatchPreview}</p>
@@ -201,11 +246,11 @@ export function CourtLiveCard({
         )}
       </CardContent>
 
-      {isAdmin && (
-        <CardFooter className="flex flex-col gap-2 border-t border-black/5 pt-4 sm:flex-row sm:flex-wrap">
+      {showAdminFooter && (
+        <CardFooter className="mt-auto flex flex-col gap-2 border-t border-black/5 bg-white/40 pt-4 sm:flex-row sm:flex-wrap">
           {!match && court.status !== "Playing" && (
             <Button
-              disabled={busy}
+              disabled={busy || !canAssignOrStart}
               onClick={onAssign}
               className="min-h-11 w-full rounded-full bg-sisclub-green hover:bg-sisclub-green-dark sm:w-auto"
             >
@@ -214,7 +259,7 @@ export function CourtLiveCard({
           )}
           {match?.status === "ready" && (
             <Button
-              disabled={busy}
+              disabled={busy || !canAssignOrStart}
               onClick={onStart}
               className="min-h-11 w-full rounded-full bg-sisclub-green hover:bg-sisclub-green-dark sm:w-auto"
             >
@@ -227,11 +272,15 @@ export function CourtLiveCard({
                 <div>
                   <Label className="text-xs">Team A</Label>
                   <Input
-                    type="number"
-                    min={0}
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
                     value={scoreInput.a}
                     onChange={(e) =>
-                      onScoreChange(e.target.value, scoreInput.b)
+                      onScoreChange(
+                        sanitizeScoreTyping(e.target.value),
+                        scoreInput.b
+                      )
                     }
                     className="rounded-xl"
                   />
@@ -239,11 +288,15 @@ export function CourtLiveCard({
                 <div>
                   <Label className="text-xs">Team B</Label>
                   <Input
-                    type="number"
-                    min={0}
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
                     value={scoreInput.b}
                     onChange={(e) =>
-                      onScoreChange(scoreInput.a, e.target.value)
+                      onScoreChange(
+                        scoreInput.a,
+                        sanitizeScoreTyping(e.target.value)
+                      )
                     }
                     className="rounded-xl"
                   />

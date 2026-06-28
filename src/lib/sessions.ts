@@ -73,6 +73,12 @@ export function mapCourt(row: CourtRow): Court {
     sidesSwapped: row.sides_swapped ?? false,
     sideChangeCount: row.side_change_count ?? 0,
     lastSideChangeAt: row.last_side_change_at ?? undefined,
+    rentalStartTime: row.rental_start_time
+      ? formatTime(row.rental_start_time)
+      : undefined,
+    rentalEndTime: row.rental_end_time
+      ? formatTime(row.rental_end_time)
+      : undefined,
     createdAt: row.created_at,
   };
 }
