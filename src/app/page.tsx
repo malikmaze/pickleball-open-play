@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { CalendarDays, Radio } from "lucide-react";
 import { PageShell } from "@/components/page-shell";
 import { APP_NAME, APP_TAGLINE } from "@/lib/constants";
 
@@ -49,6 +50,20 @@ export default function LandingPage() {
             className="inline-flex h-14 items-center justify-center rounded-full border-2 border-black/10 bg-sisclub-green text-base font-bold text-white shadow-md transition-all hover:-translate-y-0.5 hover:bg-sisclub-green-dark hover:shadow-lg"
           >
             Join Open Play
+          </Link>
+          <Link
+            href="/live"
+            className="inline-flex h-12 items-center justify-center gap-2 rounded-full border-2 border-sisclub-pink/30 bg-sisclub-pink-soft text-sm font-semibold text-sisclub-pink-dark transition-all hover:bg-sisclub-pink/20"
+          >
+            <Radio className="h-4 w-4" />
+            Watch live courts
+          </Link>
+          <Link
+            href="/dashboard"
+            className="inline-flex h-12 items-center justify-center gap-2 rounded-full border-2 border-black/10 text-sm font-semibold text-sisclub-green-dark transition-all hover:bg-sisclub-green/5"
+          >
+            <CalendarDays className="h-4 w-4" />
+            View schedule
           </Link>
         </div>
 

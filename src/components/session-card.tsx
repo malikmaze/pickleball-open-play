@@ -1,14 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { Clock, MapPin, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { Clock, MapPin, Radio, Users } from "lucide-react";
 import type { PlayerStatus, Session } from "@/types";
 import { canPlayerWithdrawRegistration } from "@/lib/player-permissions";
 import {
   countAdmittedPlayers,
   getWaitlistedPlayers,
-  isAdmittedPlayer,
 } from "@/lib/waitlist";
 import { Button } from "@/components/ui/button";
 import {
@@ -58,13 +57,17 @@ export function SessionCard({
   const isJoined = currentPlayerId
     ? session.players.some((p) => p.id === currentPlayerId)
     : false;
-  const admittedPlayers = session.players.filter((p) =>
-    isAdmittedPlayer(p.status)
-  );
+  const myPlayer = isJoined
+    ? session.players.find((p) => p.id === currentPlayerId)
+    : undefined;
   const admittedCount = countAdmittedPlayers(session.players);
   const waitlistCount = getWaitlistedPlayers(session.players).length;
   const isWaitlisted = myPlayerStatus === "Waitlisted";
   const isPast = isSessionPast(session.date);
+  const paymentPending =
+    isJoined &&
+    session.paymentRequired &&
+    myPlayer?.status === "Registered";
   const canJoin =
     canRegister && !isPast && session.status === "open" && !isJoined;
   const canJoinWaitlist =
@@ -140,63 +143,93 @@ export function SessionCard({
           </span>
         </div>
 
-        {admittedPlayers.length > 0 && (
-          <div className="mt-3 rounded-2xl bg-sisclub-pink-soft/50 px-3 py-2">
-            <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Joined
-            </p>
-            <p className="text-sm text-foreground/90">
-              {admittedPlayers.map((p) => p.name).join(", ")}
-            </p>
+        {paymentPending && (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            <p className="font-semibold">Payment pending</p>
+            {session.paymentInstructions && (
+              <p className="mt-0.5 text-xs">{session.paymentInstructions}</p>
+            )}
+          </div>
+        )}
+
+        {isWaitlisted && (
+          <div className="rounded-2xl border border-amber-200/80 bg-amber-50/80 px-3 py-2 text-sm text-amber-900">
+            You&apos;re on the waitlist — we&apos;ll add you automatically if a
+            spot opens.
           </div>
         )}
       </CardContent>
 
-      <CardFooter className="flex-col gap-2 pt-2 sm:flex-row">
-        {canJoin && (
-          <Button
-            onClick={handleJoin}
-            disabled={isLoading}
-            className="flex-1 rounded-full border-2 border-black/10 bg-sisclub-green font-semibold text-white shadow-sm transition-all hover:bg-sisclub-green-dark hover:shadow-md"
-          >
-            Join
-          </Button>
+      <CardFooter className="flex-col gap-2 pt-2">
+        {isJoined ? (
+          <div className="flex w-full flex-col gap-2 sm:flex-row">
+            <Link
+              href={`/session/${session.id}`}
+              className="inline-flex flex-1 items-center justify-center rounded-full bg-sisclub-green px-4 py-2.5 text-sm font-bold text-white hover:bg-sisclub-green-dark"
+            >
+              My status
+            </Link>
+            <Link
+              href={`/sessions/${session.id}/live`}
+              className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-full border-2 border-sisclub-pink/30 bg-sisclub-pink-soft px-4 py-2.5 text-sm font-bold text-sisclub-pink-dark hover:bg-sisclub-pink/20"
+            >
+              <Radio className="h-4 w-4" />
+              Watch live
+            </Link>
+          </div>
+        ) : (
+          <div className="flex w-full flex-col gap-2 sm:flex-row">
+            {canJoin && (
+              <Button
+                onClick={handleJoin}
+                disabled={isLoading}
+                className="flex-1 rounded-full border-2 border-black/10 bg-sisclub-green font-semibold text-white shadow-sm transition-all hover:bg-sisclub-green-dark hover:shadow-md"
+              >
+                Join
+              </Button>
+            )}
+            {canJoinWaitlist && (
+              <Button
+                onClick={handleJoin}
+                disabled={isLoading}
+                variant="outline"
+                className="flex-1 rounded-full border-2 border-amber-300/80 bg-amber-50 font-semibold text-amber-900 shadow-sm transition-all hover:bg-amber-100"
+              >
+                Join waitlist
+              </Button>
+            )}
+            {!canJoin && !canJoinWaitlist && !isPast && session.status !== "closed" && (
+              <Link
+                href={`/sessions/${session.id}/live`}
+                className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-full border-2 border-black/10 px-4 py-2.5 text-sm font-semibold text-sisclub-pink-dark hover:bg-sisclub-pink-soft/50"
+              >
+                <Radio className="h-4 w-4" />
+                Watch live
+              </Link>
+            )}
+          </div>
         )}
-        {canJoinWaitlist && (
-          <Button
-            onClick={handleJoin}
-            disabled={isLoading}
-            variant="outline"
-            className="flex-1 rounded-full border-2 border-amber-300/80 bg-amber-50 font-semibold text-amber-900 shadow-sm transition-all hover:bg-amber-100"
-          >
-            Join waitlist
-          </Button>
-        )}
+
         {canLeave && (
           <Button
-            variant="outline"
+            variant="ghost"
             onClick={handleLeave}
             disabled={isLoading}
-            className="flex-1 rounded-full border-2 border-black/10 font-semibold transition-all hover:bg-sisclub-pink-soft"
+            className="w-full text-xs text-muted-foreground hover:text-destructive"
           >
             {isWaitlisted ? "Leave waitlist" : "Leave session"}
           </Button>
         )}
         {isJoined && !canLeave && myPlayerStatus && !isWaitlisted && (
           <p className="w-full text-center text-xs text-muted-foreground">
-            Checked in — ask the admin to remove you from the queue if needed
-          </p>
-        )}
-        {isWaitlisted && (
-          <p className="w-full text-center text-xs font-medium text-amber-800">
-            On waitlist — you will be added automatically if a spot opens
+            Checked in — ask the organizer to remove you if needed
           </p>
         )}
         {isPast && !isJoined && (
           <Button
             disabled
             variant="outline"
-            className="flex-1 rounded-full border-2 border-black/10"
+            className="w-full rounded-full border-2 border-black/10"
           >
             Past session
           </Button>
@@ -205,25 +238,11 @@ export function SessionCard({
           <Button
             disabled
             variant="outline"
-            className="flex-1 rounded-full border-2 border-black/10"
+            className="w-full rounded-full border-2 border-black/10"
           >
             Closed
           </Button>
         )}
-        {isJoined && (
-          <Link
-            href={`/session/${session.id}`}
-            className="text-center text-xs font-medium text-sisclub-green underline-offset-2 hover:underline"
-          >
-            View my status →
-          </Link>
-        )}
-        <Link
-          href={`/sessions/${session.id}/live`}
-          className="text-center text-xs font-medium text-sisclub-pink-dark underline-offset-2 hover:underline"
-        >
-          Watch live →
-        </Link>
       </CardFooter>
     </Card>
   );

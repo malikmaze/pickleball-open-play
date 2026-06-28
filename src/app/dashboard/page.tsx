@@ -126,6 +126,10 @@ function DashboardContent() {
     return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
   }, [sessions]);
 
+  const mySessions = useMemo(() => {
+    return sessions.filter((session) => joinedIds[session.id]);
+  }, [sessions, joinedIds]);
+
   const todayLabel = new Date().toLocaleDateString("en-US", {
     weekday: "long",
     month: "long",
@@ -161,9 +165,44 @@ function DashboardContent() {
             </button>
           </div>
         ) : sessions.length === 0 ? (
-          <EmptyState />
+          <EmptyState
+            title="No upcoming sessions"
+            description="Check back soon — organizers add open play sessions here. You can also watch live courts when a session is running."
+          />
         ) : (
           <div className="space-y-8">
+            {!isAdmin && mySessions.length > 0 && (
+              <section className="space-y-4">
+                <h3 className="font-heading text-lg font-bold text-sisclub-green-dark">
+                  My sessions
+                </h3>
+                {mySessions.map((session, i) => {
+                  const joinedId = joinedIds[session.id];
+                  const myPlayer = joinedId
+                    ? session.players.find((p) => p.id === joinedId)
+                    : undefined;
+
+                  return (
+                    <div
+                      key={`my-${session.id}`}
+                      className="animate-fade-in-up"
+                      style={{ animationDelay: `${i * 0.08}s`, opacity: 0 }}
+                    >
+                      <SessionCard
+                        session={session}
+                        currentPlayerId={joinedId}
+                        myPlayerStatus={myPlayer?.status}
+                        onJoin={handleJoin}
+                        onLeave={handleLeave}
+                        isLoading={actionLoading}
+                        canRegister={false}
+                      />
+                    </div>
+                  );
+                })}
+              </section>
+            )}
+
             {sessionsByDate.map(([date, dateSessions]) => (
               <section key={date} className="space-y-4">
                 <h3 className="font-heading text-lg font-bold text-sisclub-green-dark">
@@ -174,7 +213,12 @@ function DashboardContent() {
                     </span>
                   )}
                 </h3>
-                {dateSessions.map((session, i) => {
+                {dateSessions
+                  .filter(
+                    (session) =>
+                      isAdmin || !joinedIds[session.id]
+                  )
+                  .map((session, i) => {
                   const joinedId = joinedIds[session.id];
                   const myPlayer = joinedId
                     ? session.players.find((p) => p.id === joinedId)

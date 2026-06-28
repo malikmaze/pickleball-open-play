@@ -83,6 +83,7 @@ function SessionAdminContent({ sessionId }: { sessionId: string }) {
   }, [sessionId]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- polling admin session data
     void load();
     const interval = setInterval(() => void load(true), 15000);
     return () => clearInterval(interval);

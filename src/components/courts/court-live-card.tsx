@@ -21,7 +21,11 @@ import {
 } from "./pickleball-court-view";
 import type { CourtPlayerInfo } from "./types";
 
-function playerInfo(players: Player[], id: string): CourtPlayerInfo {
+function playerInfo(
+  players: Player[],
+  id: string,
+  highlightPlayerId?: string
+): CourtPlayerInfo {
   const p = players.find((pl) => pl.id === id);
   const name = p?.name ?? "Player";
   return {
@@ -29,6 +33,7 @@ function playerInfo(players: Player[], id: string): CourtPlayerInfo {
     skill: p?.skillLevel,
     gamesPlayed: p?.gamesPlayed,
     gender: getPlayerGender(name),
+    isYou: highlightPlayerId === id,
   };
 }
 
@@ -49,6 +54,7 @@ export function CourtLiveCard({
   winnerFlash,
   scoreInput,
   nextMatchPreview,
+  highlightPlayerId,
   onScoreChange,
   onAssign,
   onStart,
@@ -66,6 +72,7 @@ export function CourtLiveCard({
   winnerFlash: "A" | "B" | null;
   scoreInput: { a: string; b: string };
   nextMatchPreview?: string;
+  highlightPlayerId?: string;
   onScoreChange: (a: string, b: string) => void;
   onAssign: () => void;
   onStart: () => void;
@@ -77,14 +84,14 @@ export function CourtLiveCard({
   const displayMatch = match ?? finishedMatch;
   const teamA: [CourtPlayerInfo, CourtPlayerInfo] = displayMatch
     ? [
-        playerInfo(session.players, displayMatch.teamAPlayer1Id),
-        playerInfo(session.players, displayMatch.teamAPlayer2Id),
+        playerInfo(session.players, displayMatch.teamAPlayer1Id, highlightPlayerId),
+        playerInfo(session.players, displayMatch.teamAPlayer2Id, highlightPlayerId),
       ]
     : [{ name: "—" }, { name: "—" }];
   const teamB: [CourtPlayerInfo, CourtPlayerInfo] = displayMatch
     ? [
-        playerInfo(session.players, displayMatch.teamBPlayer1Id),
-        playerInfo(session.players, displayMatch.teamBPlayer2Id),
+        playerInfo(session.players, displayMatch.teamBPlayer1Id, highlightPlayerId),
+        playerInfo(session.players, displayMatch.teamBPlayer2Id, highlightPlayerId),
       ]
     : [{ name: "—" }, { name: "—" }];
 
