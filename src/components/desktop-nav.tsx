@@ -22,7 +22,7 @@ export function DesktopNav() {
   const logout = items.find((item) => item.action === "logout");
 
   return (
-    <nav className="hidden border-b-2 border-black/10 bg-white/90 backdrop-blur-md supports-[backdrop-filter]:bg-white/80 md:block">
+    <nav className="hidden border-b border-pink-200/50 bg-gradient-to-b from-sisclub-pink-soft/50 to-white/95 backdrop-blur-md supports-[backdrop-filter]:bg-white/90 md:block">
       <div
         className={cn(
           layoutContainerClass("full"),
@@ -43,8 +43,8 @@ export function DesktopNav() {
                 className={cn(
                   "flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-all",
                   active
-                    ? "bg-sisclub-green text-white shadow-sm"
-                    : "text-muted-foreground hover:bg-sisclub-pink-soft hover:text-sisclub-green-dark"
+                    ? "bg-sisclub-green text-white shadow-md shadow-sisclub-green/25"
+                    : "text-sisclub-green-dark/70 hover:bg-sisclub-pink-soft hover:text-sisclub-green-dark"
                 )}
               >
                 <Icon className="h-4 w-4" />

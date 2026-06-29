@@ -3,9 +3,9 @@
 import Link from "next/link";
 import { useState } from "react";
 import { toast } from "sonner";
+import { GuestAppHeader, GuestPage } from "@/components/guest/guest-page";
+import { guestBtnPrimary, guestCardClass } from "@/components/guest/guest-ui";
 import { ContactNumberInput } from "@/components/contact-number-input";
-import { AppHeader } from "@/components/app-header";
-import { PageShell } from "@/components/page-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -26,6 +26,7 @@ import {
 import { usePlayerProfile } from "@/hooks/use-player-profile";
 import { PLAYER_SKILL_LEVELS, PROFILE_GENDERS, normalizeProfileGender } from "@/lib/constants";
 import { getPhilippineMobileError, parsePhilippineMobile } from "@/lib/phone";
+import { cn } from "@/lib/utils";
 import type { PlayerSkillLevel, ProfileGender } from "@/types";
 
 export default function ProfilePage() {
@@ -87,10 +88,16 @@ function ProfileForm({
   };
 
   return (
-    <PageShell>
-      <AppHeader subtitle="Your profile" backHref="/dashboard" />
-      <div className="py-4 sm:py-6">
-        <Card className="rounded-3xl border-2 border-black/10 shadow-md">
+    <GuestPage
+      header={
+        <GuestAppHeader
+          subtitle="Your profile"
+          backHref="/dashboard"
+          logoHref="/dashboard"
+        />
+      }
+    >
+        <Card className={guestCardClass}>
           <CardHeader>
             <CardTitle className="font-heading text-xl text-sisclub-green-dark">
               Player profile
@@ -160,7 +167,7 @@ function ProfileForm({
               </div>
               <Button
                 type="submit"
-                className="h-12 w-full rounded-full bg-sisclub-green font-bold text-white"
+                className={cn(guestBtnPrimary, "h-12 w-full")}
               >
                 Save profile
               </Button>
@@ -178,7 +185,6 @@ function ProfileForm({
           </Link>{" "}
           and use &quot;Find my registration&quot; on your status page.
         </p>
-      </div>
-    </PageShell>
+    </GuestPage>
   );
 }

@@ -28,6 +28,16 @@ export const adminSessionBodyGap = "pt-4 sm:pt-5";
 /** Minimal vertical padding for admin header rows (logo / actions). */
 export const adminSessionHeaderPy = "py-2";
 
+/** Guest/player horizontal inset — aligned with admin session pages. */
+export const guestPagePadding = "px-3 sm:px-4 lg:px-5";
+
+export const guestPageWidth = `w-full ${guestPagePadding}`;
+
+/** Space below guest sticky header before page content. */
+export const guestBodyGap = "pt-4 sm:pt-5";
+
+export const guestHeaderPy = "py-2";
+
 /** @deprecated Use adminSessionWidth */
 export const adminTabWidth = adminSessionWidth;
 

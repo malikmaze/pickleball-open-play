@@ -15,7 +15,7 @@ export function BottomNav() {
   const items = getPublicNavItems(loading ? "guest" : role, pathname);
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-50 border-t-2 border-black/10 bg-white/95 backdrop-blur-md md:hidden">
+    <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-pink-200/50 bg-white/95 shadow-[0_-4px_20px_rgba(255,133,162,0.12)] backdrop-blur-md md:hidden">
       <div className="mx-auto flex max-w-lg items-stretch justify-around px-1 pb-[env(safe-area-inset-bottom)]">
         {items.map((item) => {
           const Icon = item.icon;

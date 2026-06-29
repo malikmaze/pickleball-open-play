@@ -5,11 +5,16 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { CalendarDays, Loader2, MapPin } from "lucide-react";
-import { AppHeader } from "@/components/app-header";
+import { GuestAppHeader, GuestPage } from "@/components/guest/guest-page";
+import {
+  guestBtnOutline,
+  guestBtnPrimary,
+  guestCardClass,
+  guestCardJoinedClass,
+} from "@/components/guest/guest-ui";
 import { ContactNumberInput } from "@/components/contact-number-input";
 import { SessionPaymentBanner } from "@/components/session-payment-banner";
 import { FreeSessionBadge } from "@/components/free-session-badge";
-import { PageShell } from "@/components/page-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -192,9 +197,16 @@ function JoinForm() {
   const isClosed = session?.status === "closed";
 
   return (
-    <PageShell>
-      <AppHeader subtitle="Join open play" backHref="/dashboard" />
-      <div className="py-4 space-y-4 sm:py-6">
+    <GuestPage
+      header={
+        <GuestAppHeader
+          subtitle="Join open play"
+          backHref="/dashboard"
+          logoHref="/dashboard"
+        />
+      }
+      className="space-y-4"
+    >
         {sessionLoading ? (
           <div className="flex justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-sisclub-green" />
@@ -204,7 +216,7 @@ function JoinForm() {
             {!session.paymentRequired && (
               <FreeSessionBadge variant="sticker" />
             )}
-            <Card className="rounded-3xl border-2 border-sisclub-green/20 bg-gradient-to-b from-white to-sisclub-green/5">
+            <Card className={guestCardJoinedClass}>
               <CardHeader
                 className={cn(
                   "pb-2",
@@ -238,7 +250,7 @@ function JoinForm() {
         )}
 
         {isClosed ? (
-          <Card className="rounded-3xl border-2 border-black/10">
+          <Card className={guestCardClass}>
             <CardContent className="py-10 text-center">
               <p className="font-medium text-sisclub-green-dark">
                 Registration is closed
@@ -247,14 +259,14 @@ function JoinForm() {
                 This session is no longer accepting players.
               </p>
               <Link href="/dashboard">
-                <Button variant="outline" className="mt-6 rounded-full">
+                <Button variant="outline" className={cn(guestBtnOutline, "mt-6")}>
                   View other sessions
                 </Button>
               </Link>
             </CardContent>
           </Card>
         ) : (
-          <Card className="rounded-3xl border-2 border-black/10 shadow-md">
+          <Card className={guestCardClass}>
             <CardHeader>
               <CardTitle className="font-heading text-xl text-sisclub-green-dark">
                 Your details
@@ -351,7 +363,7 @@ function JoinForm() {
                 <Button
                   type="submit"
                   disabled={isSubmitting || !session}
-                  className="h-12 w-full rounded-full border-2 border-black/10 bg-sisclub-green font-bold text-white shadow-sm transition-all hover:bg-sisclub-green-dark hover:shadow-md"
+                  className={cn(guestBtnPrimary, "h-12 w-full")}
                 >
                   {isSubmitting ? (
                     <>
@@ -368,8 +380,7 @@ function JoinForm() {
             </CardContent>
           </Card>
         )}
-      </div>
-    </PageShell>
+    </GuestPage>
   );
 }
 

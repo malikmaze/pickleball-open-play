@@ -3,9 +3,9 @@
 import { Suspense, useMemo } from "react";
 import Link from "next/link";
 import { Loader2, Radio } from "lucide-react";
-import { AppHeader } from "@/components/app-header";
+import { GuestAppHeader, GuestPage } from "@/components/guest/guest-page";
+import { GuestPageHeader, guestBtnPrimary, guestCardClass } from "@/components/guest/guest-ui";
 import { EmptyState } from "@/components/empty-state";
-import { PageShell } from "@/components/page-shell";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -77,8 +77,8 @@ function LivePicker() {
             <Card
               className={
                 isJoined
-                  ? "rounded-3xl border-2 border-sisclub-green/30 shadow-sm ring-1 ring-sisclub-green/20"
-                  : "rounded-3xl border-2 border-black/10 shadow-sm transition-all hover:shadow-md"
+                  ? "rounded-3xl border-2 border-sisclub-green/30 bg-gradient-to-br from-white via-pink-50/30 to-emerald-50/40 shadow-md shadow-sisclub-green/10 ring-1 ring-sisclub-green/15"
+                  : guestCardClass
               }
             >
               <CardHeader
@@ -108,7 +108,7 @@ function LivePicker() {
             </CardHeader>
             <CardContent>
               <Link href={`/sessions/${session.id}/live`}>
-                <Button className="w-full rounded-full bg-sisclub-green font-semibold text-white sm:w-auto">
+                <Button className={cn(guestBtnPrimary, "w-full sm:w-auto")}>
                   <Radio className="mr-2 h-4 w-4" />
                   Watch live
                 </Button>
@@ -124,20 +124,26 @@ function LivePicker() {
 
 export default function LivePage() {
   return (
-    <PageShell>
-      <AppHeader subtitle="Live open play" backHref="/dashboard" />
-      <div className="py-4 sm:py-6">
-        <h2 className="mb-4 font-heading text-xl font-bold text-sisclub-green-dark sm:text-2xl">
-          Live Sessions
-        </h2>
-        <Suspense
-          fallback={
-            <Loader2 className="mx-auto h-8 w-8 animate-spin text-sisclub-green" />
-          }
-        >
-          <LivePicker />
-        </Suspense>
-      </div>
-    </PageShell>
+    <GuestPage
+      header={
+        <GuestAppHeader
+          subtitle="Courts"
+          backHref="/dashboard"
+          logoHref="/dashboard"
+        />
+      }
+    >
+      <GuestPageHeader
+        title="Live courts"
+        description="Pick a session to watch games and the queue."
+      />
+      <Suspense
+        fallback={
+          <Loader2 className="mx-auto h-8 w-8 animate-spin text-sisclub-green" />
+        }
+      >
+        <LivePicker />
+      </Suspense>
+    </GuestPage>
   );
 }

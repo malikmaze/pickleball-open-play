@@ -2,9 +2,8 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
-import { AppHeader } from "@/components/app-header";
+import { GuestAppHeader, GuestPage } from "@/components/guest/guest-page";
 import { CourtsLiveView } from "@/components/courts/courts-live-view";
-import { PageShell } from "@/components/page-shell";
 import { getJoinedPlayerId } from "@/hooks/use-player-profile";
 
 function LiveSessionContent({ sessionId }: { sessionId: string }) {
@@ -33,21 +32,27 @@ export default function LiveSessionPage({
   }, [params]);
 
   return (
-    <PageShell size="fluid">
-      <AppHeader subtitle="Live" backHref="/live" />
-      <div className="py-4 sm:py-6">
-        {sessionId ? (
-          <Suspense
-            fallback={
-              <Loader2 className="mx-auto h-8 w-8 animate-spin text-sisclub-green" />
-            }
-          >
-            <LiveSessionContent sessionId={sessionId} />
-          </Suspense>
-        ) : (
-          <Loader2 className="mx-auto h-8 w-8 animate-spin text-sisclub-green" />
-        )}
-      </div>
-    </PageShell>
+    <GuestPage
+      size="fluid"
+      header={
+        <GuestAppHeader
+          subtitle="Courts"
+          backHref="/live"
+          logoHref="/dashboard"
+        />
+      }
+    >
+      {sessionId ? (
+        <Suspense
+          fallback={
+            <Loader2 className="mx-auto h-8 w-8 animate-spin text-sisclub-green" />
+          }
+        >
+          <LiveSessionContent sessionId={sessionId} />
+        </Suspense>
+      ) : (
+        <Loader2 className="mx-auto h-8 w-8 animate-spin text-sisclub-green" />
+      )}
+    </GuestPage>
   );
 }

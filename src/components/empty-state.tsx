@@ -10,7 +10,7 @@ export function EmptyState({
   description = "Check back later or ask an organizer to add open play sessions.",
 }: EmptyStateProps) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-3xl border-2 border-dashed border-black/10 bg-white/60 px-4 py-12 text-center shadow-sm sm:px-6 sm:py-16">
+    <div className="flex flex-col items-center justify-center rounded-3xl border-2 border-dashed border-pink-200/60 bg-gradient-to-br from-white via-pink-50/40 to-emerald-50/20 px-4 py-12 text-center shadow-sm shadow-pink-100/30 sm:px-6 sm:py-16">
       <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-sisclub-pink-soft">
         <CalendarOff className="h-8 w-8 text-sisclub-pink" />
       </div>
