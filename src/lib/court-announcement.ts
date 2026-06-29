@@ -3,7 +3,6 @@ import type { ActivityLog } from "@/types";
 const STORAGE_KEY = "sisclub_court_announcements";
 /** How many times each court call is spoken (with a short pause between). */
 export const COURT_CALL_REPEAT_COUNT = 3;
-export const MATCH_WINNER_REPEAT_COUNT = 2;
 const PAUSE_BETWEEN_REPEATS_MS = 2_500;
 const PAUSE_BETWEEN_JOBS_MS = 900;
 const PAUSE_AFTER_NAME_MS = 150;
@@ -23,13 +22,6 @@ export type CourtCallInput = {
   courtNumber: number | string;
   teamA: [string, string];
   teamB: [string, string];
-};
-
-export type MatchWinnerInput = {
-  courtNumber: number | string;
-  winners: [string, string];
-  teamAScore: number;
-  teamBScore: number;
 };
 
 type SpeechSegment = {
@@ -85,70 +77,6 @@ function buildCourtCallSegments(call: CourtCallInput): SpeechSegment[] {
     { text: b2, emphasis: true, pauseAfterMs: PAUSE_AFTER_COURT_MS },
     { text: `Please proceed to ${court}` },
   ];
-}
-
-function buildWinnerCongratulationsSegments(
-  input: MatchWinnerInput
-): SpeechSegment[] {
-  const court = `Court ${input.courtNumber}`;
-  const [w1, w2] = input.winners;
-
-  return [
-    { text: court, pauseAfterMs: PAUSE_AFTER_COURT_MS },
-    { text: "Congratulations", pauseAfterMs: 400 },
-    { text: "to" },
-    { text: w1, emphasis: true, pauseAfterMs: PAUSE_AFTER_NAME_MS },
-    { text: "and" },
-    { text: w2, emphasis: true, pauseAfterMs: PAUSE_AFTER_TEAM_MS },
-    {
-      text: `Final score ${input.teamAScore} to ${input.teamBScore}`,
-    },
-  ];
-}
-
-export function matchWinnerInputFromActivity(
-  log: ActivityLog
-): MatchWinnerInput | null {
-  if (log.eventType !== "match_finished") return null;
-
-  const meta = log.metadata;
-  const courtNumber =
-    (meta.courtNumber as number | string | undefined) ??
-    log.title.replace(/^Court\s*/i, "").replace(/\s*Winner$/i, "");
-
-  const winnerNames = meta.winnerNames as string[] | undefined;
-  const teamAScore = meta.teamAScore as number | undefined;
-  const teamBScore = meta.teamBScore as number | undefined;
-
-  if (
-    winnerNames?.length === 2 &&
-    typeof teamAScore === "number" &&
-    typeof teamBScore === "number"
-  ) {
-    return {
-      courtNumber,
-      winners: [winnerNames[0], winnerNames[1]],
-      teamAScore,
-      teamBScore,
-    };
-  }
-
-  const winnersLine = log.description.split("\n")[0]?.trim();
-  const scoreLine = log.description.split("\n")[2]?.trim();
-  if (!winnersLine) return null;
-
-  const names = winnersLine.split(/\s*&\s*/);
-  if (names.length !== 2) return null;
-
-  const scoreParts = scoreLine?.match(/(\d+)\D+(\d+)/);
-  if (!scoreParts) return null;
-
-  return {
-    courtNumber,
-    winners: [names[0], names[1]],
-    teamAScore: Number(scoreParts[1]),
-    teamBScore: Number(scoreParts[2]),
-  };
 }
 
 export function courtCallInputFromActivity(
@@ -398,18 +326,6 @@ export function announceCourtCall(
   enqueueAnnouncement({
     kind: "segments",
     segments: buildCourtCallSegments(call),
-    repeats,
-  });
-}
-
-/** Congratulate the winning team — queued after any current announcement. */
-export function announceMatchWinner(
-  input: MatchWinnerInput,
-  repeats: number = MATCH_WINNER_REPEAT_COUNT
-): void {
-  enqueueAnnouncement({
-    kind: "segments",
-    segments: buildWinnerCongratulationsSegments(input),
     repeats,
   });
 }

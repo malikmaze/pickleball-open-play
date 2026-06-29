@@ -26,7 +26,6 @@ import {
 import { getQueueSessionSettings } from "@/lib/sessions";
 import {
   announceCourtCall,
-  announceMatchWinner,
   isCourtAnnouncementsEnabled,
 } from "@/lib/court-announcement";
 import { useCourtAnnouncements } from "@/hooks/use-court-announcements";
@@ -86,14 +85,12 @@ export function CourtsLiveView({
     isCourtAnnouncementsEnabled()
   );
   const skipNextCourtPollAnnounce = useRef(false);
-  const skipNextWinnerPollAnnounce = useRef(false);
   const [now, setNow] = useState(() => new Date());
 
   useCourtAnnouncements(
     bundle?.activityLogs,
     announcementsOn,
-    skipNextCourtPollAnnounce,
-    skipNextWinnerPollAnnounce
+    skipNextCourtPollAnnounce
   );
 
   useEffect(() => {
@@ -288,26 +285,6 @@ export function CourtsLiveView({
       );
       setWinnerFlash((prev) => ({ ...prev, [court.id]: result.winner! }));
       toast.success(`Court ${court.courtNumber} winner: Team ${result.winner}`);
-
-      if (isCourtAnnouncementsEnabled()) {
-        const winnerIds =
-          result.winner === "A"
-            ? [match.teamAPlayer1Id, match.teamAPlayer2Id]
-            : [match.teamBPlayer1Id, match.teamBPlayer2Id];
-        const winnerNames = winnerIds
-          .map((id) => session.players.find((p) => p.id === id)?.name)
-          .filter((name): name is string => Boolean(name));
-
-        if (winnerNames.length === 2) {
-          announceMatchWinner({
-            courtNumber: court.courtNumber,
-            winners: [winnerNames[0], winnerNames[1]],
-            teamAScore,
-            teamBScore,
-          });
-          skipNextWinnerPollAnnounce.current = true;
-        }
-      }
 
       setTimeout(async () => {
         const supabase = createClient();
