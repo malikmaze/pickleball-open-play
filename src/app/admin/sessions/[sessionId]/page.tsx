@@ -1,12 +1,15 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import { Loader2, Plus, RefreshCw } from "lucide-react";
+import { Loader2, Plus, RefreshCw, Upload } from "lucide-react";
 import { AdminSessionChrome } from "@/components/admin/session-chrome";
+import { AdminPartnerPanel } from "@/components/admin/admin-partner-panel";
 import { AddPlayerDialog } from "@/components/admin/add-player-dialog";
+import { ImportPlayersDialog } from "@/components/admin/import-players-dialog";
+import { WalkInQuickAdd } from "@/components/admin/walk-in-quick-add";
 import { PlayerRoster } from "@/components/admin/player-roster";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { PlayerStatusBadge } from "@/components/player-status-badge";
@@ -31,8 +34,10 @@ import {
   toQueuePlayer,
 } from "@/lib/queue/queue-engine";
 import { formatCourtRentalWindow } from "@/lib/court-schedule";
+import { PartnerQueueGroup } from "@/components/live/partner-queue-connector";
+import { groupAdjacentQueuePartners } from "@/lib/player-partners";
 import { FREE_SESSION_PAYMENT_NOTE } from "@/lib/constants";
-import { formatSessionDate, getQueueSessionSettings } from "@/lib/sessions";
+import { formatSessionDate } from "@/lib/sessions";
 import {
   countAdmittedPlayers,
   getWaitlistedPlayers,
@@ -45,14 +50,16 @@ import {
   deletePlayerRecord,
   fetchSessionBundle,
   markPlayerNoShow,
+  markPlayerPaid,
   markPlayerPresent,
-  markPlayerSecured,
+  markPlayerUnpaid,
   markPlayersPresentBulk,
   processWaitlistPromotions,
+  setPlayerPartnerRecord,
   updatePlayerRecord,
   updateSessionRecord,
 } from "@/utils/supabase/queries";
-import type { Player, PlayerSkillLevel, SessionBundle } from "@/types";
+import type { Player, PlayerSkillLevel, ProfileGender, SessionBundle } from "@/types";
 
 function SessionAdminContent({ sessionId }: { sessionId: string }) {
   const searchParams = useSearchParams();
@@ -63,9 +70,11 @@ function SessionAdminContent({ sessionId }: { sessionId: string }) {
   const [settingsForm, setSettingsForm] = useState<SessionFormValues | null>(null);
   const [addingTestPlayers, setAddingTestPlayers] = useState(false);
   const [addPlayerOpen, setAddPlayerOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [removeTarget, setRemoveTarget] = useState<string | null>(null);
   const [removeLoading, setRemoveLoading] = useState(false);
   const [bulkLoading, setBulkLoading] = useState(false);
+  const [partnerSaving, setPartnerSaving] = useState(false);
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -94,15 +103,43 @@ function SessionAdminContent({ sessionId }: { sessionId: string }) {
 
   const handlePlayerStatus = async (
     playerId: string,
-    action: "present" | "secured" | "noshow"
+    action: "present" | "noshow"
   ) => {
     const supabase = createClient();
     try {
-      if (action === "present") await markPlayerPresent(supabase, playerId);
-      if (action === "secured") await markPlayerSecured(supabase, playerId);
+      if (action === "present") await markPlayerPresent(supabase, playerId, sessionId);
       if (action === "noshow") await markPlayerNoShow(supabase, playerId, sessionId);
-      toast.success("Player updated");
+      toast.success(action === "present" ? "Checked in" : "Marked no show");
       await load();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Update failed");
+    }
+  };
+
+  const handlePayment = async (playerId: string, paid: boolean) => {
+    const supabase = createClient();
+    try {
+      if (paid) {
+        await markPlayerPaid(supabase, playerId, sessionId);
+        toast.success("Marked paid");
+      } else {
+        await markPlayerUnpaid(supabase, playerId);
+        toast.success("Marked unpaid");
+      }
+      await load();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Payment update failed");
+    }
+  };
+
+  const handleGenderChange = async (
+    playerId: string,
+    gender: ProfileGender
+  ) => {
+    const supabase = createClient();
+    try {
+      await updatePlayerRecord(supabase, playerId, { gender });
+      await load(true);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Update failed");
     }
@@ -169,6 +206,23 @@ function SessionAdminContent({ sessionId }: { sessionId: string }) {
     }
   };
 
+  const handlePartnerChange = async (
+    playerId: string,
+    partnerId: string | null
+  ) => {
+    setPartnerSaving(true);
+    const supabase = createClient();
+    try {
+      await setPlayerPartnerRecord(supabase, sessionId, playerId, partnerId);
+      toast.success(partnerId ? "Partner updated" : "Partner removed");
+      await load();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Partner update failed");
+    } finally {
+      setPartnerSaving(false);
+    }
+  };
+
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!session || !settingsForm) return;
@@ -212,6 +266,15 @@ function SessionAdminContent({ sessionId }: { sessionId: string }) {
     }
   };
 
+  const queuePlayers = useMemo(
+    () => (session ? session.players.map((p) => toQueuePlayer(p)) : []),
+    [session]
+  );
+  const eligible = useMemo(
+    () => getEligiblePlayers(queuePlayers),
+    [queuePlayers]
+  );
+
   if (loading || !session) {
     return (
       <div className="flex justify-center py-20">
@@ -219,9 +282,6 @@ function SessionAdminContent({ sessionId }: { sessionId: string }) {
       </div>
     );
   }
-
-  const queuePlayers = session.players.map((p) => toQueuePlayer(p));
-  const eligible = getEligiblePlayers(queuePlayers, getQueueSessionSettings(session));
 
   return (
     <>
@@ -261,7 +321,7 @@ function SessionAdminContent({ sessionId }: { sessionId: string }) {
             </CardHeader>
             <CardContent className="space-y-2 text-sm">
               <p>
-                Joined: {countAdmittedPlayers(session.players)} /{" "}
+                Booked: {countAdmittedPlayers(session.players)} /{" "}
                 {session.maxPlayers}
               </p>
               <p>Waitlist: {getWaitlistedPlayers(session.players).length}</p>
@@ -311,22 +371,73 @@ function SessionAdminContent({ sessionId }: { sessionId: string }) {
 
       {(tab === "registrations" || tab === "checkin") && (
         <>
-          <div className="mb-4 flex flex-wrap gap-2">
-            <Button
-              onClick={() => setAddPlayerOpen(true)}
-              className="rounded-full bg-sisclub-green font-semibold hover:bg-sisclub-green-dark"
-            >
-              <Plus className="mr-1 h-4 w-4" />
-              Add walk-in
-            </Button>
-          </div>
+          {tab === "registrations" && (
+            <>
+              <div className="mb-4 rounded-2xl border border-black/10 bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
+                <p className="font-medium text-sisclub-green-dark">Booked</p>
+                <p className="mt-1">
+                  Players who signed up — booking app, messenger, or the public
+                  join page. They are <strong>not</strong> in the queue until
+                  checked in. Some may not show even if already paid; use{" "}
+                  <strong>Mark paid</strong> when payment is confirmed.
+                </p>
+              </div>
+              <div className="mb-4 flex flex-wrap gap-2">
+                <Button
+                  onClick={() => setImportOpen(true)}
+                  variant="outline"
+                  className="rounded-full border-2 border-black/10"
+                >
+                  <Upload className="mr-1 h-4 w-4" />
+                  Bulk import
+                </Button>
+                <Button
+                  onClick={() => setAddPlayerOpen(true)}
+                  className="rounded-full bg-sisclub-green font-semibold hover:bg-sisclub-green-dark"
+                >
+                  <Plus className="mr-1 h-4 w-4" />
+                  Add booking
+                </Button>
+              </div>
+            </>
+          )}
+
+          {tab === "checkin" && (
+            <div className="mb-4 space-y-3">
+              <div className="rounded-2xl border border-black/10 bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
+                <p className="font-medium text-sisclub-green-dark">Check-in</p>
+                <p className="mt-1">
+                  Like a flight — only <strong>checked-in</strong> players enter
+                  the queue. Walk-ins can be added and checked in at once below.
+                </p>
+              </div>
+              <WalkInQuickAdd
+                session={session}
+                players={session.players.filter((p) =>
+                  isAdmittedPlayer(p.status)
+                )}
+                onAdded={() => load(true)}
+              />
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  onClick={() => setAddPlayerOpen(true)}
+                  variant="outline"
+                  className="rounded-full border-2 border-black/10"
+                >
+                  Walk-in — more options
+                </Button>
+              </div>
+            </div>
+          )}
+
           <PlayerRoster
             players={session.players.filter((p) => isAdmittedPlayer(p.status))}
-            mode={tab === "checkin" ? "checkin" : "registrations"}
-            session={session}
+            mode={tab === "checkin" ? "checkin" : "booked"}
             onStatus={handlePlayerStatus}
+            onPayment={handlePayment}
             onRemove={(id) => setRemoveTarget(id)}
             onSkillChange={handleSkillChange}
+            onGenderChange={handleGenderChange}
             onBulkPresent={tab === "checkin" ? handleBulkPresent : undefined}
             bulkLoading={bulkLoading}
           />
@@ -343,52 +454,77 @@ function SessionAdminContent({ sessionId }: { sessionId: string }) {
       )}
 
       {tab === "queue" && (
-        <Card className="rounded-3xl border-2 border-black/10">
-          <CardHeader>
-            <CardTitle>Active queue</CardTitle>
-            <CardDescription>
-              Fair order: fewest games played, then longest wait. Remove players
-              who leave the court.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {eligible.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No players in queue.</p>
-            ) : (
-              eligible.map((p, i) => (
-                <div
-                  key={p.id}
-                  className="flex items-center justify-between gap-2 rounded-2xl bg-sisclub-pink-soft/40 px-4 py-3"
-                >
-                  <div>
-                    <p className="font-semibold">
-                      #{i + 1} {p.name}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {p.skillLevel} · {p.gamesPlayed} games played
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <PlayerStatusBadge status={p.status} />
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      className="rounded-full"
-                      onClick={() => setRemoveTarget(p.id)}
+        <div className="space-y-4">
+          <AdminPartnerPanel
+            players={session.players.filter((p) => isAdmittedPlayer(p.status))}
+            onPartnerChange={handlePartnerChange}
+            disabled={partnerSaving}
+          />
+          <Card className="rounded-3xl border-2 border-black/10">
+            <CardHeader>
+              <CardTitle>Active queue</CardTitle>
+              <CardDescription>
+                Fair order by games played and wait time. Linking partners moves
+                the earlier player down to wait with their partner; pairs are
+                always on the same team when assigned.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {eligible.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No players in queue.</p>
+              ) : (
+                groupAdjacentQueuePartners(eligible).map((group) => {
+                  const renderRow = (
+                    p: (typeof eligible)[number],
+                    position: number
+                  ) => (
+                    <div
+                      key={p.id}
+                      className="flex items-center justify-between gap-2 rounded-2xl bg-sisclub-pink-soft/40 px-4 py-3"
                     >
-                      Remove
-                    </Button>
-                  </div>
-                </div>
-              ))
-            )}
-            <Link href={`/admin/sessions/${sessionId}/courts`}>
-              <Button className="mt-2 rounded-full bg-sisclub-green hover:bg-sisclub-green-dark">
-                Manage Courts
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
+                      <div>
+                        <p className="font-semibold">
+                          #{position} {p.name}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {p.skillLevel} · {p.gamesPlayed} games played
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <PlayerStatusBadge status={p.status} />
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          className="rounded-full"
+                          onClick={() => setRemoveTarget(p.id)}
+                        >
+                          Remove
+                        </Button>
+                      </div>
+                    </div>
+                  );
+
+                  if (group.kind === "pair") {
+                    const [first, second] = group.players;
+                    return (
+                      <PartnerQueueGroup key={`${first.id}-${second.id}`}>
+                        {renderRow(first, group.startIndex + 1)}
+                        {renderRow(second, group.startIndex + 2)}
+                      </PartnerQueueGroup>
+                    );
+                  }
+
+                  return renderRow(group.player, group.index + 1);
+                })
+              )}
+              <Link href={`/admin/sessions/${sessionId}/courts`}>
+                <Button className="mt-2 rounded-full bg-sisclub-green hover:bg-sisclub-green-dark">
+                  Manage Courts
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+        </div>
       )}
 
       {tab === "settings" && settingsForm && (
@@ -424,8 +560,17 @@ function SessionAdminContent({ sessionId }: { sessionId: string }) {
       <AddPlayerDialog
         open={addPlayerOpen}
         onOpenChange={setAddPlayerOpen}
-        sessionId={sessionId}
+        session={session}
+        players={session.players}
+        mode={tab === "checkin" ? "walkin" : "register"}
         onAdded={() => load(true)}
+      />
+
+      <ImportPlayersDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        session={session}
+        onImported={() => load(true)}
       />
 
       <ConfirmDialog

@@ -502,6 +502,146 @@ export async function registerPlayerRecord(
 /** @deprecated Use registerPlayerRecord */
 export const joinSessionRecord = registerPlayerRecord;
 
+export interface AdminAddPlayerOptions {
+  /** Check in on add — Present status, enters queue when admitted. */
+  checkIn?: boolean;
+  /** Payment collected — sets securedAt (independent of session payment settings). */
+  paymentConfirmed?: boolean;
+}
+
+export async function adminAddPlayerRecord(
+  supabase: Client,
+  sessionId: string,
+  player: {
+    name: string;
+    contactNumber?: string;
+    gender?: ProfileGender;
+    skillLevel: PlayerSkillLevel;
+    note?: string;
+  },
+  options: AdminAddPlayerOptions = {}
+): Promise<{ playerId: string; waitlisted: boolean; status: PlayerStatus }> {
+  const session = await fetchSessionById(supabase, sessionId);
+  if (!session) throw new Error("Session not found");
+  if (session.status === "closed") throw new Error("This session is closed");
+
+  const admittedCount = countAdmittedPlayers(session.players);
+  const waitlisted = admittedCount >= session.maxPlayers;
+
+  const contactStored = player.contactNumber?.trim()
+    ? parsePhilippineMobile(player.contactNumber)
+    : null;
+  if (player.contactNumber?.trim() && !contactStored) {
+    throw new Error(PH_MOBILE_ERROR);
+  }
+
+  const now = new Date().toISOString();
+  const paid = Boolean(options.paymentConfirmed);
+  let status: PlayerStatus = waitlisted ? "Waitlisted" : "Registered";
+
+  if (!waitlisted) {
+    if (options.checkIn) {
+      status = "Present";
+    } else if (paid) {
+      status = "Secured";
+    }
+  }
+
+  const { data, error } = await supabase
+    .from("players")
+    .insert({
+      session_id: sessionId,
+      name: player.name.trim(),
+      contact_number: contactStored,
+      gender: player.gender ?? null,
+      skill_level: player.skillLevel,
+      note: player.note?.trim() || null,
+      status,
+      checked_in_at: status === "Present" ? now : null,
+      secured_at: paid ? now : null,
+    })
+    .select("id")
+    .single();
+  if (error) throw new Error(error.message);
+
+  if (status === "Present") {
+    await logActivity(
+      supabase,
+      sessionId,
+      "check_in",
+      player.name.trim(),
+      "Checked In"
+    );
+  } else if (status === "Secured") {
+    await logActivity(
+      supabase,
+      sessionId,
+      "payment_confirmed",
+      player.name.trim(),
+      "Payment Confirmed"
+    );
+  }
+
+  await syncSessionCapacityRecord(supabase, sessionId);
+  return { playerId: data.id, waitlisted, status };
+}
+
+export async function importPlayersRecord(
+  supabase: Client,
+  sessionId: string,
+  players: {
+    name: string;
+    contactNumber?: string;
+    skillLevel: PlayerSkillLevel;
+    note?: string;
+  }[],
+  options: AdminAddPlayerOptions = {}
+): Promise<{
+  added: number;
+  waitlisted: number;
+  checkedIn: number;
+  skipped: number;
+  errors: string[];
+}> {
+  const session = await fetchSessionById(supabase, sessionId);
+  if (!session) throw new Error("Session not found");
+
+  const existingNames = new Set(
+    session.players.map((p) => p.name.trim().toLowerCase())
+  );
+
+  let added = 0;
+  let waitlisted = 0;
+  let checkedIn = 0;
+  let skipped = 0;
+  const errors: string[] = [];
+
+  for (const row of players) {
+    const name = row.name.trim();
+    if (!name) continue;
+
+    const key = name.toLowerCase();
+    if (existingNames.has(key)) {
+      skipped++;
+      continue;
+    }
+
+    try {
+      const result = await adminAddPlayerRecord(supabase, sessionId, row, options);
+      existingNames.add(key);
+      added++;
+      if (result.waitlisted) waitlisted++;
+      if (result.status === "Present") checkedIn++;
+    } catch (err) {
+      errors.push(
+        `${name}: ${err instanceof Error ? err.message : "Failed to add"}`
+      );
+    }
+  }
+
+  return { added, waitlisted, checkedIn, skipped, errors };
+}
+
 export async function findPlayerByContactInSession(
   supabase: Client,
   sessionId: string,
@@ -542,6 +682,11 @@ export async function deletePlayerRecord(
   supabase: Client,
   playerId: string
 ): Promise<void> {
+  await supabase
+    .from("players")
+    .update({ partner_id: null })
+    .eq("partner_id", playerId);
+
   const { error } = await supabase.from("players").delete().eq("id", playerId);
   if (error) throw error;
 }
@@ -552,6 +697,7 @@ export async function updatePlayerRecord(
   updates: {
     status?: PlayerStatus;
     skillLevel?: PlayerSkillLevel;
+    gender?: ProfileGender | null;
     note?: string;
     isActive?: boolean;
     gamesPlayed?: number;
@@ -564,6 +710,7 @@ export async function updatePlayerRecord(
   if (updates.status !== undefined) payload.status = updates.status;
   if (updates.skillLevel !== undefined)
     payload.skill_level = updates.skillLevel;
+  if (updates.gender !== undefined) payload.gender = updates.gender;
   if (updates.note !== undefined) payload.note = updates.note ?? null;
   if (updates.isActive !== undefined) payload.is_active = updates.isActive;
   if (updates.gamesPlayed !== undefined)
@@ -579,6 +726,71 @@ export async function updatePlayerRecord(
     .update(payload)
     .eq("id", playerId);
   if (error) throw error;
+}
+
+export async function setPlayerPartnerRecord(
+  supabase: Client,
+  sessionId: string,
+  playerId: string,
+  partnerId: string | null
+): Promise<void> {
+  if (partnerId === playerId) {
+    throw new Error("A player cannot partner with themselves");
+  }
+
+  const { data: player, error: playerError } = await supabase
+    .from("players")
+    .select("id, session_id, partner_id")
+    .eq("id", playerId)
+    .single();
+  if (playerError) throw playerError;
+  if (!player || player.session_id !== sessionId) {
+    throw new Error("Player not found in this session");
+  }
+
+  const previousPartnerId = player.partner_id;
+
+  if (partnerId) {
+    const { data: partner, error: partnerError } = await supabase
+      .from("players")
+      .select("id, session_id, partner_id")
+      .eq("id", partnerId)
+      .single();
+    if (partnerError) throw partnerError;
+    if (!partner || partner.session_id !== sessionId) {
+      throw new Error("Partner must be in the same session");
+    }
+
+    if (partner.partner_id && partner.partner_id !== playerId) {
+      await supabase
+        .from("players")
+        .update({ partner_id: null })
+        .eq("id", partner.partner_id)
+        .eq("partner_id", partnerId);
+    }
+  }
+
+  if (previousPartnerId && previousPartnerId !== partnerId) {
+    await supabase
+      .from("players")
+      .update({ partner_id: null })
+      .eq("id", previousPartnerId)
+      .eq("partner_id", playerId);
+  }
+
+  const { error: updateError } = await supabase
+    .from("players")
+    .update({ partner_id: partnerId })
+    .eq("id", playerId);
+  if (updateError) throw updateError;
+
+  if (partnerId) {
+    const { error: mutualError } = await supabase
+      .from("players")
+      .update({ partner_id: playerId })
+      .eq("id", partnerId);
+    if (mutualError) throw mutualError;
+  }
 }
 
 export async function markPlayerPresent(
@@ -613,26 +825,63 @@ export async function markPlayerSecured(
   playerId: string,
   sessionId?: string
 ): Promise<void> {
+  await markPlayerPaid(supabase, playerId, sessionId);
+}
+
+export async function markPlayerPaid(
+  supabase: Client,
+  playerId: string,
+  sessionId?: string
+): Promise<void> {
   const { data: player } = await supabase
     .from("players")
-    .select("name, session_id")
+    .select("name, session_id, status")
     .eq("id", playerId)
     .single();
 
-  await updatePlayerRecord(supabase, playerId, {
-    status: "Secured",
-    securedAt: new Date().toISOString(),
-  });
+  if (!player) throw new Error("Player not found");
 
-  if (player) {
-    await logActivity(
-      supabase,
-      sessionId ?? player.session_id,
-      "payment_confirmed",
-      player.name,
-      "Payment Confirmed"
-    );
+  const now = new Date().toISOString();
+  const updates: Parameters<typeof updatePlayerRecord>[2] = {
+    securedAt: now,
+  };
+
+  if (player.status === "Registered") {
+    updates.status = "Secured";
   }
+
+  await updatePlayerRecord(supabase, playerId, updates);
+
+  await logActivity(
+    supabase,
+    sessionId ?? player.session_id,
+    "payment_confirmed",
+    player.name,
+    "Payment Confirmed"
+  );
+}
+
+export async function markPlayerUnpaid(
+  supabase: Client,
+  playerId: string
+): Promise<void> {
+  const { data: player } = await supabase
+    .from("players")
+    .select("status")
+    .eq("id", playerId)
+    .single();
+
+  if (!player) throw new Error("Player not found");
+
+  const updates: Parameters<typeof updatePlayerRecord>[2] = {
+    securedAt: null,
+  };
+
+  if (player.status === "Secured") {
+    updates.status = "Registered";
+  }
+
+  await updatePlayerRecord(supabase, playerId, updates);
 }
 
 export async function markPlayerNoShow(

@@ -25,7 +25,7 @@ function initials(name: string) {
   return name.trim().charAt(0).toUpperCase() || "?";
 }
 
-function CourtPlayerChip({
+export function CourtPlayerChip({
   player,
   team,
 }: {
@@ -34,7 +34,7 @@ function CourtPlayerChip({
 }) {
   const isA = team === "A";
   const isTest = isTestPlayerName(player.name);
-  const isFemale = player.gender !== "male";
+  const isFemale = player.gender === "female";
 
   return (
     <div
@@ -90,12 +90,15 @@ export function PickleballCourtView({
   teamB,
   sidesSwapped = false,
   isPlaying = false,
+  emptyLabel = "Court view",
   className,
 }: {
   teamA: [CourtPlayerInfo, CourtPlayerInfo];
   teamB: [CourtPlayerInfo, CourtPlayerInfo];
   sidesSwapped?: boolean;
   isPlaying?: boolean;
+  /** Badge label when the court has no players yet */
+  emptyLabel?: string;
   className?: string;
 }) {
   const left = sidesSwapped ? teamB : teamA;
@@ -114,7 +117,7 @@ export function PickleballCourtView({
       <div className="relative w-full overflow-hidden rounded-3xl border-2 border-pink-200/60 bg-gradient-to-br from-pink-50/80 via-white to-violet-50/80 shadow-inner">
         <div className="pointer-events-none absolute left-3 top-3 z-10 flex items-center gap-1 rounded-full bg-white/80 px-2 py-1 text-[10px] font-medium text-pink-500 shadow-sm backdrop-blur">
           <Sparkles className="h-3 w-3" />
-          {isPlaying ? "Live rally" : "Court view"}
+          {isPlaying ? "Live rally" : hasPlayers ? "Court view" : emptyLabel}
         </div>
         <div className="aspect-[4/3] min-h-[200px] w-full sm:min-h-[260px] md:min-h-[280px]">
           <PickleballCourt3D

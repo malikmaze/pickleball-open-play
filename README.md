@@ -132,7 +132,7 @@ pnpm build
 
 `src/lib/queue/queue-engine.ts`:
 
-- `getEligiblePlayers()` — payment-aware eligibility
+- `getEligiblePlayers()` — Present and Waiting (checked-in) players only
 - `selectNextFourPlayers()` — fair + skill-aware selection
 - `balanceTeams()` — balanced doubles teams
 - `createNextMatchForCourt()` — full assignment

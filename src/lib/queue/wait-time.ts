@@ -4,7 +4,6 @@ import type { QueuePlayer } from "@/lib/queue/queue-engine";
 export function waitingSinceTimestamp(player: {
   checkedInAt?: string | null;
   lastPlayedAt?: string | null;
-  joinedAt: string;
 }): number {
   if (player.lastPlayedAt) {
     return new Date(player.lastPlayedAt).getTime();
@@ -12,13 +11,12 @@ export function waitingSinceTimestamp(player: {
   if (player.checkedInAt) {
     return new Date(player.checkedInAt).getTime();
   }
-  return new Date(player.joinedAt).getTime();
+  return Date.now();
 }
 
 export function formatWaitingTime(player: {
   checkedInAt?: string | null;
   lastPlayedAt?: string | null;
-  joinedAt: string;
 }): string {
   const ms = Date.now() - waitingSinceTimestamp(player);
   const mins = Math.max(0, Math.floor(ms / 60_000));

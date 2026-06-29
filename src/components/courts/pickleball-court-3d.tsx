@@ -211,7 +211,7 @@ function PlayerCharacter({
   const hairColors = ["#5c3d2e", "#2d1b14", "#8b5a3c", "#c9956b"];
   const hairColor =
     hairColors[Math.abs(player.name.charCodeAt(0)) % hairColors.length];
-  const isFemale = player.gender !== "male";
+  const isFemale = player.gender === "female";
 
   useFrame(({ clock }) => {
     if (!group.current) return;
@@ -262,6 +262,42 @@ function Ball({ isPlaying, sidesSwapped }: { isPlaying: boolean; sidesSwapped: b
   );
 }
 
+function CourtEnvironment() {
+  return (
+    <>
+      <ambientLight intensity={0.65} />
+      <directionalLight
+        position={[6, 12, 4]}
+        intensity={1.1}
+        castShadow
+        shadow-mapSize={[1024, 1024]}
+      />
+      <directionalLight position={[-4, 6, -6]} intensity={0.4} color="#ffe4f0" />
+      <pointLight position={[0, 4, 0]} intensity={0.3} color="#ffb7d5" />
+
+      <Grass />
+      <CourtSurface />
+      <Net />
+      <Fence />
+      <BlossomTree x={-5.5} z={-3} />
+      <BlossomTree x={5.5} z={3} scale={0.85} />
+      <BlossomTree x={5.8} z={-2.5} scale={0.7} />
+
+      <Text
+        position={[0, 0.05, 0]}
+        rotation={[-Math.PI / 2, 0, 0]}
+        fontSize={0.32}
+        color="#ffb7d5"
+        anchorX="center"
+        anchorY="middle"
+        fillOpacity={0.35}
+      >
+        SisClub
+      </Text>
+    </>
+  );
+}
+
 function CourtScene({
   teamA,
   teamB,
@@ -283,23 +319,7 @@ function CourtScene({
 
   return (
     <>
-      <ambientLight intensity={0.65} />
-      <directionalLight
-        position={[6, 12, 4]}
-        intensity={1.1}
-        castShadow
-        shadow-mapSize={[1024, 1024]}
-      />
-      <directionalLight position={[-4, 6, -6]} intensity={0.4} color="#ffe4f0" />
-      <pointLight position={[0, 4, 0]} intensity={0.3} color="#ffb7d5" />
-
-      <Grass />
-      <CourtSurface />
-      <Net />
-      <Fence />
-      <BlossomTree x={-5.5} z={-3} />
-      <BlossomTree x={5.5} z={3} scale={0.85} />
-      <BlossomTree x={5.8} z={-2.5} scale={0.7} />
+      <CourtEnvironment />
 
       <PlayerCharacter
         position={[-0.9, 0, lz]}
@@ -327,45 +347,12 @@ function CourtScene({
       />
 
       <Ball isPlaying={isPlaying} sidesSwapped={sidesSwapped} />
-
-      <Text
-        position={[0, 0.05, 0]}
-        rotation={[-Math.PI / 2, 0, 0]}
-        fontSize={0.32}
-        color="#ffb7d5"
-        anchorX="center"
-        anchorY="middle"
-        fillOpacity={0.35}
-      >
-        SisClub
-      </Text>
     </>
   );
 }
 
 function EmptyCourtScene3D() {
-  return (
-    <>
-      <ambientLight intensity={0.65} />
-      <directionalLight position={[6, 12, 4]} intensity={1.1} castShadow />
-      <pointLight position={[0, 4, 0]} intensity={0.25} color="#ffb7d5" />
-      <Grass />
-      <CourtSurface />
-      <Net />
-      <Fence />
-      <BlossomTree x={-5.5} z={-3} />
-      <BlossomTree x={5.5} z={3} />
-      <Text
-        position={[0, 1.2, 0]}
-        fontSize={0.28}
-        color="#e85d82"
-        anchorX="center"
-        anchorY="middle"
-      >
-        Court Ready ♡
-      </Text>
-    </>
-  );
+  return <CourtEnvironment />;
 }
 
 export function PickleballCourt3D({

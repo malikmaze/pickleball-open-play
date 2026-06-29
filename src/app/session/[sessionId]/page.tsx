@@ -27,7 +27,6 @@ import { findPlayerCourt, getGuestStatusHint } from "@/lib/guest-status";
 import { canPlayerWithdrawRegistration } from "@/lib/player-permissions";
 import { getQueuePosition, toQueuePlayer } from "@/lib/queue/queue-engine";
 import { getWaitlistPosition } from "@/lib/waitlist";
-import { getQueueSessionSettings } from "@/lib/sessions";
 import { getPhilippineMobileError } from "@/lib/phone";
 import { createClient } from "@/utils/supabase/client";
 import {
@@ -170,7 +169,7 @@ function SessionStatusContent({ sessionId }: { sessionId: string }) {
   const queuePlayers = session.players.map((p) => toQueuePlayer(p));
   const queuePosition =
     myPlayer && myPlayer.status !== "Waitlisted"
-      ? getQueuePosition(queuePlayers, myPlayer.id, getQueueSessionSettings(session))
+      ? getQueuePosition(queuePlayers, myPlayer.id)
       : null;
   const waitlistPosition = myPlayer
     ? getWaitlistPosition(session.players, myPlayer.id)

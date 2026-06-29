@@ -36,11 +36,7 @@ export type WinnerTeam = "A" | "B";
 
 export type UserRole = "guest" | "admin";
 
-export type ProfileGender =
-  | "Woman"
-  | "Man"
-  | "Non-binary"
-  | "Prefer not to say";
+export type ProfileGender = "Male" | "Female" | "Others";
 
 export type ActivityEventType =
   | "match_finished"
@@ -87,6 +83,7 @@ export interface Player {
   securedAt?: string;
   isActive: boolean;
   joinedAt: string;
+  partnerId?: string;
 }
 
 export interface Session {

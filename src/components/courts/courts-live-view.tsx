@@ -101,21 +101,15 @@ export function CourtsLiveView({
 
   const queuePlayers = useMemo(() => {
     if (!session) return [];
-    return getEligiblePlayers(
-      session.players.map((p) => toQueuePlayer(p)),
-      queueSettings(session)
-    );
+    return getEligiblePlayers(session.players.map((p) => toQueuePlayer(p)));
   }, [session]);
 
-  const nextPreview = useMemo(() => {
+  const nextAssignment = useMemo(() => {
     if (!session) return null;
-    const assignment = previewNextMatch(
+    return previewNextMatch(
       session.players.map((p) => toQueuePlayer(p)),
       queueSettings(session)
     );
-    if (!assignment) return null;
-    const names = assignment.players.map((p) => p.name).join(", ");
-    return names;
   }, [session]);
 
   const finishedByCourt = useMemo(() => {
@@ -159,7 +153,7 @@ export function CourtsLiveView({
         teamBPlayer2Id: b2.id,
       });
       setCourtMatches((prev) => ({ ...prev, [court.id]: match }));
-      toast.success(`Match assigned to Court ${court.courtNumber}`);
+      toast.success(`Next match assigned to Court ${court.courtNumber}`);
       await load();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Assign failed");
@@ -453,14 +447,14 @@ export function CourtsLiveView({
               busy={busyCourt === court.id}
               winnerFlash={winnerFlash[court.id] ?? null}
               scoreInput={score}
-              nextMatchPreview={
-                isAdmin &&
+              nextMatch={
                 !match &&
                 court.status === "Empty" &&
                 isCourtRentalActive(court, session, now)
-                  ? nextPreview ?? undefined
+                  ? nextAssignment
                   : undefined
               }
+              queueCount={queuePlayers.length}
               highlightPlayerId={highlightPlayerId}
               now={now}
               onScoreChange={(a, b) =>
@@ -481,6 +475,7 @@ export function CourtsLiveView({
         <div className="grid gap-4 md:grid-cols-2">
           <QueuePanel
             players={queuePlayers}
+            partnerPool={session.players}
             highlightPlayerId={highlightPlayerId}
           />
 
@@ -495,6 +490,7 @@ export function CourtsLiveView({
           <div className="space-y-4">
             <QueuePanel
             players={queuePlayers}
+            partnerPool={session.players}
             highlightPlayerId={highlightPlayerId}
           />
             <WinnerHistory

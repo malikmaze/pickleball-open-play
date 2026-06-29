@@ -19,12 +19,14 @@ import {
 } from "@/lib/court-schedule";
 import { sanitizeScoreTyping } from "@/lib/numbers";
 import { cn } from "@/lib/utils";
-import { getPlayerGender } from "@/lib/player-gender";
+import { resolvePlayerCourtGender } from "@/lib/player-gender";
 import type { Court, Match, Player, Session } from "@/types";
 import {
   CourtScoreboard,
   PickleballCourtView,
 } from "./pickleball-court-view";
+import { EmptyCourtView } from "./empty-court-view";
+import type { NextMatchAssignment } from "@/lib/queue/queue-engine";
 import type { CourtPlayerInfo } from "./types";
 
 function playerInfo(
@@ -38,7 +40,7 @@ function playerInfo(
     name,
     skill: p?.skillLevel,
     gamesPlayed: p?.gamesPlayed,
-    gender: getPlayerGender(name),
+    gender: resolvePlayerCourtGender(p?.gender, name),
     isYou: highlightPlayerId === id,
   };
 }
@@ -59,7 +61,8 @@ export function CourtLiveCard({
   busy,
   winnerFlash,
   scoreInput,
-  nextMatchPreview,
+  nextMatch,
+  queueCount = 0,
   highlightPlayerId,
   onScoreChange,
   onAssign,
@@ -78,7 +81,8 @@ export function CourtLiveCard({
   busy: boolean;
   winnerFlash: "A" | "B" | null;
   scoreInput: { a: string; b: string };
-  nextMatchPreview?: string;
+  nextMatch?: NextMatchAssignment | null;
+  queueCount?: number;
   highlightPlayerId?: string;
   now?: Date;
   onScoreChange: (a: string, b: string) => void;
@@ -227,22 +231,13 @@ export function CourtLiveCard({
             )}
           </div>
         ) : (
-          <div className="flex flex-1 flex-col overflow-hidden rounded-2xl border-2 border-dashed border-sisclub-green/30">
-            <PickleballCourtView
-              teamA={[{ name: "—" }, { name: "—" }]}
-              teamB={[{ name: "—" }, { name: "—" }]}
-            />
-            <p className="border-t border-sisclub-green/10 py-3 text-center text-sm text-muted-foreground">
-              Waiting for next match
-            </p>
-          </div>
-        )}
-
-        {nextMatchPreview && canAssignOrStart && (
-          <div className="rounded-2xl bg-sisclub-pink-soft/40 px-3 py-2 text-xs">
-            <p className="font-semibold text-sisclub-pink-dark">Next up</p>
-            <p className="text-muted-foreground">{nextMatchPreview}</p>
-          </div>
+          <EmptyCourtView
+            nextMatch={canAssignOrStart ? nextMatch : null}
+            queueCount={queueCount}
+            targetScore={session.targetScore}
+            winBy={session.winBy}
+            className="flex-1"
+          />
         )}
       </CardContent>
 
@@ -254,7 +249,7 @@ export function CourtLiveCard({
               onClick={onAssign}
               className="min-h-11 w-full rounded-full bg-sisclub-green hover:bg-sisclub-green-dark sm:w-auto"
             >
-              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Assign Next Match"}
+              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Assign next"}
             </Button>
           )}
           {match?.status === "ready" && (

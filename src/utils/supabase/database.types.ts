@@ -104,6 +104,7 @@ export type Database = {
           checked_in_at: string | null;
           secured_at: string | null;
           is_active: boolean;
+          partner_id: string | null;
         };
         Insert: {
           id?: string;
@@ -121,6 +122,7 @@ export type Database = {
           checked_in_at?: string | null;
           secured_at?: string | null;
           is_active?: boolean;
+          partner_id?: string | null;
         };
         Update: {
           id?: string;
@@ -138,6 +140,7 @@ export type Database = {
           checked_in_at?: string | null;
           secured_at?: string | null;
           is_active?: boolean;
+          partner_id?: string | null;
         };
         Relationships: [
           {

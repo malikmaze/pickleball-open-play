@@ -1,4 +1,4 @@
-import { normalizePlayerSkill } from "@/lib/constants";
+import { normalizePlayerSkill, normalizeProfileGender } from "@/lib/constants";
 import { countAdmittedPlayers } from "@/lib/waitlist";
 import type {
   CourtRow,
@@ -21,7 +21,6 @@ import type {
   Session,
   ActivityLog,
   ActivityEventType,
-  ProfileGender,
   SessionActivity,
   SessionSkillLevel,
   SessionStatus,
@@ -51,7 +50,7 @@ export function mapPlayer(row: PlayerRow): Player {
     userId: row.user_id ?? undefined,
     name: row.name,
     contactNumber: row.contact_number ?? undefined,
-    gender: (row.gender as ProfileGender) ?? undefined,
+    gender: row.gender ? normalizeProfileGender(row.gender) : undefined,
     skillLevel: normalizePlayerSkill(row.skill_level),
     note: row.note ?? undefined,
     status: row.status as PlayerStatus,
@@ -61,6 +60,7 @@ export function mapPlayer(row: PlayerRow): Player {
     securedAt: row.secured_at ?? undefined,
     isActive: row.is_active ?? true,
     joinedAt: row.joined_at,
+    partnerId: row.partner_id ?? undefined,
   };
 }
 
@@ -130,7 +130,7 @@ export function mapProfile(row: ProfileRow): UserProfile {
     email: row.email,
     fullName: row.full_name,
     contactNumber: row.contact_number ?? undefined,
-    gender: row.gender as ProfileGender,
+    gender: normalizeProfileGender(row.gender),
     skillLevel: normalizePlayerSkill(row.skill_level),
     createdAt: row.created_at,
   };
