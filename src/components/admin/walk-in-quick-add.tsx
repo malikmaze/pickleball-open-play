@@ -25,6 +25,8 @@ import {
 import { countAdmittedPlayers, getAvailableSpots } from "@/lib/waitlist";
 import { createClient } from "@/utils/supabase/client";
 import { adminAddPlayerRecord } from "@/utils/supabase/queries";
+import { adminBtnPrimary } from "@/components/admin/admin-ui";
+import { cn } from "@/lib/utils";
 import type { Player, PlayerSkillLevel, ProfileGender, Session } from "@/types";
 
 const genderItems = Object.fromEntries(
@@ -111,7 +113,7 @@ export function WalkInQuickAdd({
   };
 
   return (
-    <div className="rounded-3xl border-2 border-sisclub-green/25 bg-sisclub-green/5 p-4 sm:p-5">
+    <div className="rounded-3xl border-2 border-sisclub-green/25 bg-gradient-to-br from-sisclub-green/8 to-white p-4 sm:p-5">
       <div className="mb-3">
         <h3 className="flex items-center gap-2 font-heading text-base font-bold text-sisclub-green-dark">
           <UserPlus className="h-4 w-4" />
@@ -132,8 +134,8 @@ export function WalkInQuickAdd({
           void submit();
         }}
       >
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className="space-y-1.5 sm:col-span-2">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.2fr)_repeat(2,minmax(0,10rem))] lg:items-end">
+          <div className="space-y-1.5 sm:col-span-2 lg:col-span-1">
             <Label htmlFor="walkin-quick-name">Name</Label>
             <Input
               ref={nameRef}
@@ -205,7 +207,7 @@ export function WalkInQuickAdd({
           <Button
             type="submit"
             disabled={saving || !name.trim() || !!duplicate}
-            className="rounded-full bg-sisclub-green font-semibold hover:bg-sisclub-green-dark sm:min-w-[10rem]"
+            className={cn(adminBtnPrimary, "sm:min-w-[10rem]")}
           >
             {saving ? (
               <Loader2 className="h-4 w-4 animate-spin" />

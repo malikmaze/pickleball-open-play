@@ -12,6 +12,10 @@ export function DesktopNav() {
   const searchParams = useSearchParams();
   const activeTab = searchParams.get("tab");
   const { role, loading, signOut } = useAuth();
+
+  // Session chrome includes Dashboard + Logout on admin session routes.
+  if (pathname.startsWith("/admin")) return null;
+
   const items = getNavItems(loading ? "guest" : role);
 
   const links = items.filter((item) => item.action !== "logout");

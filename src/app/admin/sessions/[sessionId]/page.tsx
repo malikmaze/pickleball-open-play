@@ -4,22 +4,28 @@ import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import { Loader2, Plus, RefreshCw, Upload } from "lucide-react";
-import { AdminSessionChrome } from "@/components/admin/session-chrome";
-import { AdminPartnerPanel } from "@/components/admin/admin-partner-panel";
+import { Loader2, Plus, Upload } from "lucide-react";
+import { AdminSessionPage } from "@/components/admin/session-page";
+import { AdminSessionHeader } from "@/components/admin/admin-session-header";
+import {
+  AdminCallout,
+  AdminSection,
+  adminBtnOutline,
+  adminBtnPrimary,
+  adminCardClass,
+} from "@/components/admin/admin-ui";
+import { AdminQueueTab } from "@/components/admin/admin-queue-tab";
 import { AddPlayerDialog } from "@/components/admin/add-player-dialog";
 import { ImportPlayersDialog } from "@/components/admin/import-players-dialog";
 import { WalkInQuickAdd } from "@/components/admin/walk-in-quick-add";
 import { PlayerRoster } from "@/components/admin/player-roster";
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import { PlayerStatusBadge } from "@/components/player-status-badge";
 import {
   SessionForm,
   sessionFormToPayload,
   sessionToFormValues,
   type SessionFormValues,
 } from "@/components/admin/session-form";
-import { PageShell } from "@/components/page-shell";
 import { SkillBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -34,10 +40,8 @@ import {
   toQueuePlayer,
 } from "@/lib/queue/queue-engine";
 import { formatCourtRentalWindow } from "@/lib/court-schedule";
-import { PartnerQueueGroup } from "@/components/live/partner-queue-connector";
-import { groupAdjacentQueuePartners } from "@/lib/player-partners";
 import { FREE_SESSION_PAYMENT_NOTE } from "@/lib/constants";
-import { formatSessionDate } from "@/lib/sessions";
+import { cn } from "@/lib/utils";
 import {
   countAdmittedPlayers,
   getWaitlistedPlayers,
@@ -82,7 +86,9 @@ function SessionAdminContent({ sessionId }: { sessionId: string }) {
       const supabase = createClient();
       const data = await fetchSessionBundle(supabase, sessionId);
       setBundle(data);
-      if (data) setSettingsForm(sessionToFormValues(data.session, data.courts));
+      if (data && !(silent && tab === "settings")) {
+        setSettingsForm(sessionToFormValues(data.session, data.courts));
+      }
     } catch (err) {
       if (!silent) {
         toast.error(err instanceof Error ? err.message : "Failed to load session");
@@ -90,14 +96,15 @@ function SessionAdminContent({ sessionId }: { sessionId: string }) {
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [sessionId]);
+  }, [sessionId, tab]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- polling admin session data
     void load();
+    if (tab === "settings") return;
     const interval = setInterval(() => void load(true), 15000);
     return () => clearInterval(interval);
-  }, [load]);
+  }, [load, tab]);
 
   const session = bundle?.session;
 
@@ -285,116 +292,113 @@ function SessionAdminContent({ sessionId }: { sessionId: string }) {
 
   return (
     <>
-      <div className="mb-2 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
-          <h2 className="font-heading text-xl font-bold text-sisclub-green-dark sm:text-2xl">
-            {session.title}
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            {formatSessionDate(session.date)} · {session.startTime} –{" "}
-            {session.endTime} · {session.location}
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Link
-            href={`/sessions/${sessionId}/live`}
-            className="inline-flex h-9 items-center rounded-full border-2 border-black/10 px-3 text-sm font-medium hover:bg-sisclub-pink-soft"
-          >
-            Guest live view
-          </Link>
-          <Button
-            variant="outline"
-            onClick={() => load()}
-            className="rounded-full border-2 border-black/10"
-          >
-            <RefreshCw className="mr-1 h-4 w-4" />
-            Refresh
-          </Button>
-        </div>
-      </div>
-
       {tab === "overview" && (
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Card className="rounded-3xl border-2 border-black/10">
-            <CardHeader>
-              <CardTitle>Session snapshot</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2 text-sm">
-              <p>
-                Booked: {countAdmittedPlayers(session.players)} /{" "}
-                {session.maxPlayers}
-              </p>
-              <p>Waitlist: {getWaitlistedPlayers(session.players).length}</p>
-              <p>
-                Checked in:{" "}
-                {session.players.filter((p) => p.status === "Present").length}
-              </p>
-              <p>In queue: {eligible.length}</p>
-              <p>Playing: {session.players.filter((p) => p.status === "Playing").length}</p>
-              <p>Courts: {session.courtCount}</p>
-              {bundle?.courts.map((court) => {
-                const window = formatCourtRentalWindow(court, session);
-                if (!window) return null;
-                return (
-                  <p key={court.id} className="text-muted-foreground">
-                    Court {court.courtNumber}: {window}
+        <>
+          <AdminSessionHeader
+            session={session}
+            sessionId={sessionId}
+            onRefresh={() => load()}
+            loading={loading}
+            showStats
+          />
+
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <Card className={adminCardClass}>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">Payment</CardTitle>
+              </CardHeader>
+              <CardContent className="text-sm">
+                {session.paymentRequired ? (
+                  <div className="space-y-2">
+                    <p className="font-semibold text-sisclub-green-dark">
+                      Payment required
+                      {session.paymentAmount
+                        ? ` · ₱${session.paymentAmount}`
+                        : ""}
+                    </p>
+                    {session.paymentNote && <p>{session.paymentNote}</p>}
+                    {session.paymentInstructions && (
+                      <p className="text-muted-foreground">
+                        {session.paymentInstructions}
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <p className="rounded-2xl border border-sisclub-green/25 bg-sisclub-green/10 px-3 py-2 font-medium text-sisclub-green-dark">
+                    {FREE_SESSION_PAYMENT_NOTE}
                   </p>
-                );
-              })}
-              <SkillBadge level={session.skillLevel} />
-            </CardContent>
-          </Card>
-          <Card className="rounded-3xl border-2 border-black/10">
-            <CardHeader>
-              <CardTitle>Payment</CardTitle>
-            </CardHeader>
-            <CardContent className="text-sm">
-              {session.paymentRequired ? (
-                <>
-                  <p className="font-semibold text-sisclub-green-dark">
-                    Payment required
-                    {session.paymentAmount
-                      ? ` · ₱${session.paymentAmount}`
-                      : ""}
-                  </p>
-                  {session.paymentNote && <p className="mt-2">{session.paymentNote}</p>}
-                </>
-              ) : (
-                <p className="rounded-2xl border border-sisclub-green/25 bg-sisclub-green/10 px-3 py-2 font-medium text-sisclub-green-dark">
-                  {FREE_SESSION_PAYMENT_NOTE}
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className={adminCardClass}>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">Match rules</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm">
+                <p>
+                  Game to <strong>{session.targetScore}</strong> · Win by{" "}
+                  <strong>{session.winBy}</strong>
                 </p>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+                <p>
+                  Skill matching:{" "}
+                  <strong>{session.skillMatchingMode}</strong>
+                </p>
+                <p>
+                  Auto assign:{" "}
+                  <strong>
+                    {session.autoAssignNextMatch ? "On" : "Off"}
+                  </strong>
+                </p>
+                <SkillBadge level={session.skillLevel} />
+              </CardContent>
+            </Card>
+
+            {bundle && bundle.courts.length > 0 && (
+              <Card className={cn(adminCardClass, "md:col-span-2 xl:col-span-1")}>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">Court rentals</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-1.5 text-sm">
+                  {bundle.courts.map((court) => {
+                    const window = formatCourtRentalWindow(court, session);
+                    return (
+                      <p key={court.id} className="flex justify-between gap-3">
+                        <span className="font-medium text-sisclub-green-dark">
+                          Court {court.courtNumber}
+                        </span>
+                        <span className="text-muted-foreground">
+                          {window ?? "—"}
+                        </span>
+                      </p>
+                    );
+                  })}
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </>
       )}
 
       {(tab === "registrations" || tab === "checkin") && (
-        <>
+        <div className="space-y-4">
           {tab === "registrations" && (
             <>
-              <div className="mb-4 rounded-2xl border border-black/10 bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
-                <p className="font-medium text-sisclub-green-dark">Booked</p>
-                <p className="mt-1">
-                  Players who signed up — booking app, messenger, or the public
-                  join page. They are <strong>not</strong> in the queue until
-                  checked in. Some may not show even if already paid; use{" "}
-                  <strong>Mark paid</strong> when payment is confirmed.
-                </p>
-              </div>
-              <div className="mb-4 flex flex-wrap gap-2">
+              <AdminCallout title="Booked players">
+                Players who signed up are <strong>not</strong> in the queue until
+                checked in. Use <strong>Mark paid</strong> when payment is
+                confirmed.
+              </AdminCallout>
+              <div className="flex flex-wrap gap-2">
                 <Button
                   onClick={() => setImportOpen(true)}
                   variant="outline"
-                  className="rounded-full border-2 border-black/10"
+                  className={adminBtnOutline}
                 >
                   <Upload className="mr-1 h-4 w-4" />
                   Bulk import
                 </Button>
-                <Button
-                  onClick={() => setAddPlayerOpen(true)}
-                  className="rounded-full bg-sisclub-green font-semibold hover:bg-sisclub-green-dark"
-                >
+                <Button onClick={() => setAddPlayerOpen(true)} className={adminBtnPrimary}>
                   <Plus className="mr-1 h-4 w-4" />
                   Add booking
                 </Button>
@@ -403,14 +407,11 @@ function SessionAdminContent({ sessionId }: { sessionId: string }) {
           )}
 
           {tab === "checkin" && (
-            <div className="mb-4 space-y-3">
-              <div className="rounded-2xl border border-black/10 bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
-                <p className="font-medium text-sisclub-green-dark">Check-in</p>
-                <p className="mt-1">
-                  Like a flight — only <strong>checked-in</strong> players enter
-                  the queue. Walk-ins can be added and checked in at once below.
-                </p>
-              </div>
+            <div className="space-y-4">
+              <AdminCallout title="Check-in" tone="success">
+                Only <strong>checked-in</strong> players enter the queue. Walk-ins
+                can be added and checked in at once below.
+              </AdminCallout>
               <WalkInQuickAdd
                 session={session}
                 players={session.players.filter((p) =>
@@ -418,15 +419,13 @@ function SessionAdminContent({ sessionId }: { sessionId: string }) {
                 )}
                 onAdded={() => load(true)}
               />
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  onClick={() => setAddPlayerOpen(true)}
-                  variant="outline"
-                  className="rounded-full border-2 border-black/10"
-                >
-                  Walk-in — more options
-                </Button>
-              </div>
+              <Button
+                onClick={() => setAddPlayerOpen(true)}
+                variant="outline"
+                className={adminBtnOutline}
+              >
+                Walk-in — more options
+              </Button>
             </div>
           )}
 
@@ -450,108 +449,44 @@ function SessionAdminContent({ sessionId }: { sessionId: string }) {
               onRemove={(id) => setRemoveTarget(id)}
             />
           )}
-        </>
+        </div>
       )}
 
       {tab === "queue" && (
-        <div className="space-y-4">
-          <AdminPartnerPanel
-            players={session.players.filter((p) => isAdmittedPlayer(p.status))}
-            onPartnerChange={handlePartnerChange}
-            disabled={partnerSaving}
-          />
-          <Card className="rounded-3xl border-2 border-black/10">
-            <CardHeader>
-              <CardTitle>Active queue</CardTitle>
-              <CardDescription>
-                Fair order by games played and wait time. Linking partners moves
-                the earlier player down to wait with their partner; pairs are
-                always on the same team when assigned.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {eligible.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No players in queue.</p>
-              ) : (
-                groupAdjacentQueuePartners(eligible).map((group) => {
-                  const renderRow = (
-                    p: (typeof eligible)[number],
-                    position: number
-                  ) => (
-                    <div
-                      key={p.id}
-                      className="flex items-center justify-between gap-2 rounded-2xl bg-sisclub-pink-soft/40 px-4 py-3"
-                    >
-                      <div>
-                        <p className="font-semibold">
-                          #{position} {p.name}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {p.skillLevel} · {p.gamesPlayed} games played
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <PlayerStatusBadge status={p.status} />
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          className="rounded-full"
-                          onClick={() => setRemoveTarget(p.id)}
-                        >
-                          Remove
-                        </Button>
-                      </div>
-                    </div>
-                  );
-
-                  if (group.kind === "pair") {
-                    const [first, second] = group.players;
-                    return (
-                      <PartnerQueueGroup key={`${first.id}-${second.id}`}>
-                        {renderRow(first, group.startIndex + 1)}
-                        {renderRow(second, group.startIndex + 2)}
-                      </PartnerQueueGroup>
-                    );
-                  }
-
-                  return renderRow(group.player, group.index + 1);
-                })
-              )}
-              <Link href={`/admin/sessions/${sessionId}/courts`}>
-                <Button className="mt-2 rounded-full bg-sisclub-green hover:bg-sisclub-green-dark">
-                  Manage Courts
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
-        </div>
+        <AdminQueueTab
+          session={session}
+          sessionId={sessionId}
+          eligible={eligible}
+          partnerPlayers={session.players.filter((p) => isAdmittedPlayer(p.status))}
+          onPartnerChange={handlePartnerChange}
+          partnerSaving={partnerSaving}
+          onRemovePlayer={(id) => setRemoveTarget(id)}
+        />
       )}
 
       {tab === "settings" && settingsForm && (
         <form onSubmit={handleSaveSettings} className="space-y-4">
-          <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleAddTestPlayers}
-              disabled={addingTestPlayers}
-              className="rounded-full border-2 border-amber-300/60 text-amber-900 hover:bg-amber-50"
-            >
-              {addingTestPlayers ? (
-                <Loader2 className="mr-1 h-4 w-4 animate-spin" />
-              ) : null}
-              Add test players (demo)
-            </Button>
-          </div>
-          <SessionForm
-            values={settingsForm}
-            onChange={setSettingsForm}
-          />
+          <AdminCallout title="Session settings" tone="warning">
+            Changes apply to this session immediately after you save. Court count
+            and rental times affect live assignment.
+          </AdminCallout>
           <Button
-            type="submit"
-            disabled={saving}
-            className="rounded-full bg-sisclub-green hover:bg-sisclub-green-dark"
+            type="button"
+            variant="outline"
+            onClick={handleAddTestPlayers}
+            disabled={addingTestPlayers}
+            className={cn(
+              adminBtnOutline,
+              "border-amber-300/60 text-amber-900 hover:bg-amber-50"
+            )}
           >
+            {addingTestPlayers ? (
+              <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+            ) : null}
+            Add test players (demo)
+          </Button>
+          <SessionForm values={settingsForm} onChange={setSettingsForm} />
+          <Button type="submit" disabled={saving} className={adminBtnPrimary}>
             {saving ? "Saving…" : "Save settings"}
           </Button>
         </form>
@@ -603,23 +538,21 @@ function WaitlistPanel({
   const hasCapacity = admittedCount < maxPlayers;
 
   return (
-    <div className="mt-8 space-y-3">
-      <div>
-        <h3 className="font-heading text-lg font-bold text-sisclub-green-dark">
-          Waitlist
-        </h3>
-        <p className="text-sm text-muted-foreground">
-          First in line is admitted automatically when a spot opens. You can
-          also admit manually if there is room.
-        </p>
-      </div>
+    <AdminSection
+      title="Waitlist"
+      description="First in line is admitted when a spot opens. You can also admit manually if there is room."
+      className="mt-6"
+    >
       {players.length === 0 ? (
         <p className="text-sm text-muted-foreground">No one on the waitlist.</p>
       ) : (
-        players.map((player, index) => (
-          <Card key={player.id} className="rounded-2xl border-2 border-orange-200/80">
-            <CardContent className="flex flex-wrap items-center justify-between gap-3 pt-4">
-              <div>
+        <div className="divide-y divide-black/5 rounded-2xl border border-black/5">
+          {players.map((player, index) => (
+            <div
+              key={player.id}
+              className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
+            >
+              <div className="min-w-0">
                 <p className="font-semibold text-sisclub-green-dark">
                   #{index + 1} {player.name}
                 </p>
@@ -634,7 +567,7 @@ function WaitlistPanel({
               <div className="flex flex-wrap gap-2">
                 <Button
                   size="sm"
-                  className="rounded-full bg-sisclub-green hover:bg-sisclub-green-dark"
+                  className={adminBtnPrimary}
                   disabled={!hasCapacity}
                   onClick={() => onAdmit(player.id)}
                 >
@@ -649,11 +582,11 @@ function WaitlistPanel({
                   Remove
                 </Button>
               </div>
-            </CardContent>
-          </Card>
-        ))
+            </div>
+          ))}
+        </div>
       )}
-    </div>
+    </AdminSection>
   );
 }
 
@@ -677,16 +610,10 @@ export default function SessionAdminPage({
   }
 
   return (
-    <PageShell size="wide">
-      <AdminSessionChrome
-        sessionId={sessionId}
-        subtitle="Session management"
-      />
-      <div className="py-4 sm:py-5">
-        <Suspense fallback={<Loader2 className="mx-auto h-8 w-8 animate-spin text-sisclub-green" />}>
-          <SessionAdminContent sessionId={sessionId} />
-        </Suspense>
-      </div>
-    </PageShell>
+    <AdminSessionPage sessionId={sessionId} subtitle="Session management">
+      <Suspense fallback={<Loader2 className="mx-auto h-8 w-8 animate-spin text-sisclub-green" />}>
+        <SessionAdminContent sessionId={sessionId} />
+      </Suspense>
+    </AdminSessionPage>
   );
 }

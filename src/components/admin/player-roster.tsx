@@ -4,8 +4,12 @@ import { useMemo, useState } from "react";
 import { Search } from "lucide-react";
 import { PlayerPaymentBadge } from "@/components/player-payment-badge";
 import { PlayerStatusBadge } from "@/components/player-status-badge";
+import {
+  AdminSection,
+  adminBtnOutline,
+  adminBtnPrimary,
+} from "@/components/admin/admin-ui";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -106,10 +110,16 @@ export function PlayerRoster({
         ? "No one to check in yet."
         : "No players match your search.";
 
+  const title = mode === "booked" ? "Player roster" : "Check-in list";
+  const description =
+    mode === "booked"
+      ? `${filtered.length} of ${players.length} bookings shown`
+      : `${filtered.length} players · filter to find who still needs check-in`;
+
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <div className="relative flex-1">
+    <AdminSection title={title} description={description}>
+      <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center">
+        <div className="relative w-full lg:max-w-sm">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={search}
@@ -128,7 +138,7 @@ export function PlayerRoster({
           }}
           onValueChange={(v) => setStatusFilter(v as StatusFilter)}
         >
-          <SelectTrigger className="w-full rounded-full border-2 border-black/10 sm:w-48">
+          <SelectTrigger className="w-full rounded-full border-2 border-black/10 lg:w-44">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -145,7 +155,7 @@ export function PlayerRoster({
             type="button"
             disabled={bulkLoading}
             onClick={() => onBulkPresent(pendingIds)}
-            className="rounded-full bg-sisclub-green font-semibold hover:bg-sisclub-green-dark"
+            className={adminBtnPrimary}
           >
             Check in all ({pendingIds.length})
           </Button>
@@ -155,53 +165,66 @@ export function PlayerRoster({
       {filtered.length === 0 ? (
         <p className="text-sm text-muted-foreground">{emptyCopy}</p>
       ) : (
-        <div className="space-y-3">
-          {filtered.map((player) => {
-            const waitLabel = player.checkedInAt
-              ? `checked in ${new Date(player.checkedInAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`
-              : `booked ${new Date(player.joinedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`;
+        <div className="overflow-hidden rounded-2xl border border-black/5">
+          <div className="hidden grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto] gap-3 border-b border-black/5 bg-muted/30 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground md:grid">
+            <span>Player</span>
+            <span>Details</span>
+            <span className="text-right">Actions</span>
+          </div>
+          <div className="divide-y divide-black/5">
+            {filtered.map((player) => {
+              const waitLabel = player.checkedInAt
+                ? `Checked in ${new Date(player.checkedInAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`
+                : `Booked ${new Date(player.joinedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`;
 
-            const paid = isPlayerPaid(player);
-            const canCheckIn =
-              player.status === "Registered" || player.status === "Secured";
+              const paid = isPlayerPaid(player);
+              const canCheckIn =
+                player.status === "Registered" || player.status === "Secured";
 
-            return (
-              <Card
-                key={player.id}
-                className="rounded-2xl border-2 border-black/10"
-              >
-                <CardContent className="space-y-3 pt-4">
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <div>
-                      <p className="font-semibold text-sisclub-green-dark">
-                        {player.name}
+              return (
+                <div
+                  key={player.id}
+                  className="grid gap-3 px-4 py-3 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto] md:items-center"
+                >
+                  <div className="min-w-0">
+                    <p className="font-semibold text-sisclub-green-dark">
+                      {player.name}
+                    </p>
+                    <p className="text-xs text-muted-foreground md:hidden">
+                      {player.contactNumber || "No contact"} · {waitLabel}
+                    </p>
+                    {player.note && (
+                      <p className="mt-0.5 text-xs italic text-muted-foreground">
+                        {player.note}
                       </p>
-                      <p className="text-xs text-muted-foreground">
-                        {player.contactNumber || "No contact"} ·{" "}
-                        {player.skillLevel}
-                        {player.gender ? ` · ${player.gender}` : ""} ·{" "}
-                        {waitLabel}
-                      </p>
-                      {player.note && (
-                        <p className="mt-1 text-xs italic text-muted-foreground">
-                          {player.note}
-                        </p>
-                      )}
-                    </div>
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <PlayerPaymentBadge player={player} />
-                      {mode !== "checkin" && (
-                        <PlayerStatusBadge status={player.status} />
-                      )}
-                    </div>
+                    )}
                   </div>
 
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                    <span className="hidden md:inline">
+                      {player.contactNumber || "No contact"}
+                    </span>
+                    <span className="hidden md:inline">·</span>
+                    <span>{player.skillLevel}</span>
+                    {player.gender && (
+                      <>
+                        <span>·</span>
+                        <span>{player.gender}</span>
+                      </>
+                    )}
+                    <span className="hidden md:inline">· {waitLabel}</span>
+                    <PlayerPaymentBadge player={player} />
+                    {mode !== "checkin" && (
+                      <PlayerStatusBadge status={player.status} />
+                    )}
+                  </div>
+
+                  <div className="flex flex-wrap gap-2 md:justify-end">
                     {mode === "checkin" && canCheckIn && (
                       <>
                         <Button
                           size="sm"
-                          className="rounded-full bg-sisclub-green hover:bg-sisclub-green-dark"
+                          className={adminBtnPrimary}
                           onClick={() => onStatus(player.id, "present")}
                         >
                           Check in
@@ -209,7 +232,7 @@ export function PlayerRoster({
                         <Button
                           size="sm"
                           variant="outline"
-                          className="rounded-full"
+                          className={adminBtnOutline}
                           onClick={() => onStatus(player.id, "noshow")}
                         >
                           No show
@@ -218,8 +241,8 @@ export function PlayerRoster({
                     )}
 
                     {mode === "booked" && player.status === "Waitlisted" && (
-                      <span className="text-xs text-muted-foreground">
-                        On waitlist
+                      <span className="self-center text-xs text-muted-foreground">
+                        Waitlist
                       </span>
                     )}
 
@@ -227,7 +250,7 @@ export function PlayerRoster({
                       <Button
                         size="sm"
                         variant="outline"
-                        className="rounded-full"
+                        className={adminBtnOutline}
                         disabled={player.status === "Waitlisted"}
                         onClick={() => onPayment(player.id, true)}
                       >
@@ -237,10 +260,10 @@ export function PlayerRoster({
                       <Button
                         size="sm"
                         variant="outline"
-                        className="rounded-full"
+                        className={adminBtnOutline}
                         onClick={() => onPayment(player.id, false)}
                       >
-                        Mark unpaid
+                        Unpaid
                       </Button>
                     )}
 
@@ -251,7 +274,7 @@ export function PlayerRoster({
                         onSkillChange(player.id, v as PlayerSkillLevel)
                       }
                     >
-                      <SelectTrigger className="h-9 w-full rounded-full sm:h-8 sm:w-36">
+                      <SelectTrigger className="h-8 w-full rounded-full sm:w-32">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -271,7 +294,7 @@ export function PlayerRoster({
                           v && onGenderChange(player.id, v as ProfileGender)
                         }
                       >
-                        <SelectTrigger className="h-9 w-full rounded-full sm:h-8 sm:w-36">
+                        <SelectTrigger className="h-8 w-full rounded-full sm:w-28">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -293,12 +316,12 @@ export function PlayerRoster({
                       Remove
                     </Button>
                   </div>
-                </CardContent>
-              </Card>
-            );
-          })}
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
-    </div>
+    </AdminSection>
   );
 }

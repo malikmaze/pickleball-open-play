@@ -42,6 +42,8 @@ import {
   sanitizeDecimalTyping,
 } from "@/lib/numbers";
 import type { Court, SessionSkillLevel, SkillMatchingMode } from "@/types";
+import { adminFormWidth, fieldWidth2xl, fieldWidthLg, fieldWidthMd, fieldWidthSm, fieldWidthXl, fieldWidthXs } from "@/lib/layout";
+import { adminCardClass } from "@/components/admin/admin-ui";
 import { cn } from "@/lib/utils";
 
 export interface SessionFormValues {
@@ -128,10 +130,12 @@ export function SessionForm({
   values,
   onChange,
   showBasics = true,
+  className,
 }: {
   values: SessionFormValues;
   onChange: (values: SessionFormValues) => void;
   showBasics?: boolean;
+  className?: string;
 }) {
   const set = <K extends keyof SessionFormValues>(
     key: K,
@@ -139,9 +143,9 @@ export function SessionForm({
   ) => onChange({ ...values, [key]: value });
 
   return (
-    <div className="space-y-4">
+    <div className={cn("space-y-4", adminFormWidth, className)}>
       {showBasics && (
-        <Card className="rounded-3xl border-2 border-black/10">
+        <Card className={adminCardClass}>
           <CardHeader className="pb-3">
             <CardTitle className="text-base">Basic Details</CardTitle>
             <CardDescription>
@@ -156,11 +160,11 @@ export function SessionForm({
                 value={values.title}
                 onChange={(e) => set("title", e.target.value)}
                 placeholder="Morning Open Play"
-                className="rounded-2xl border-2 border-black/10"
+                className={cn("rounded-2xl border-2 border-black/10", fieldWidth2xl)}
                 required
               />
             </div>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:max-w-xl">
               <div className="space-y-2">
                 <Label htmlFor="date">Date</Label>
                 <Input
@@ -168,7 +172,7 @@ export function SessionForm({
                   type="date"
                   value={values.date}
                   onChange={(e) => set("date", e.target.value)}
-                  className="rounded-2xl border-2 border-black/10"
+                  className={cn("rounded-2xl border-2 border-black/10", fieldWidthMd)}
                   required
                 />
               </div>
@@ -182,6 +186,7 @@ export function SessionForm({
                   max={MAX_SESSION_PLAYERS}
                   maxDigits={3}
                   fallback={8}
+                  className={fieldWidthSm}
                   required
                 />
                 <p className="text-xs text-muted-foreground">
@@ -189,7 +194,7 @@ export function SessionForm({
                 </p>
               </div>
             </div>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:max-w-md">
               <div className="space-y-2">
                 <Label htmlFor="startTime">Start time</Label>
                 <Input
@@ -211,7 +216,7 @@ export function SessionForm({
                         : values.courtSchedules,
                     });
                   }}
-                  className="rounded-2xl border-2 border-black/10"
+                  className={cn("rounded-2xl border-2 border-black/10", fieldWidthMd)}
                   required
                 />
               </div>
@@ -236,7 +241,7 @@ export function SessionForm({
                         : values.courtSchedules,
                     });
                   }}
-                  className="rounded-2xl border-2 border-black/10"
+                  className={cn("rounded-2xl border-2 border-black/10", fieldWidthMd)}
                   required
                 />
                 <p className="text-xs text-muted-foreground">
@@ -251,7 +256,7 @@ export function SessionForm({
                 id="location"
                 value={values.location}
                 onChange={(e) => set("location", e.target.value)}
-                className="rounded-2xl border-2 border-black/10"
+                className={cn("rounded-2xl border-2 border-black/10", fieldWidthXl)}
                 required
               />
             </div>
@@ -261,7 +266,7 @@ export function SessionForm({
                 value={values.skillLevel}
                 onValueChange={(v) => set("skillLevel", v as SessionSkillLevel)}
               >
-                <SelectTrigger className="rounded-2xl border-2 border-black/10">
+                <SelectTrigger className={cn("rounded-2xl border-2 border-black/10", fieldWidthLg)}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -277,7 +282,7 @@ export function SessionForm({
         </Card>
       )}
 
-      <Card className="rounded-3xl border-2 border-black/10">
+      <Card className={adminCardClass}>
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Payment Settings</CardTitle>
           <CardDescription>Payment rules for joining</CardDescription>
@@ -307,7 +312,7 @@ export function SessionForm({
               !values.paymentRequired && "pointer-events-none opacity-50"
             )}
           >
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-2 sm:max-w-md">
             <div className="space-y-2">
               <Label>Payment amount</Label>
               <Input
@@ -327,7 +332,7 @@ export function SessionForm({
                   }
                 }}
                 placeholder="0.00"
-                className="rounded-2xl border-2 border-black/10"
+                className={cn("rounded-2xl border-2 border-black/10", fieldWidthSm)}
                 disabled={!values.paymentRequired}
               />
             </div>
@@ -337,7 +342,7 @@ export function SessionForm({
                 value={values.paymentNote}
                 onChange={(e) => set("paymentNote", e.target.value)}
                 placeholder="e.g. GCash"
-                className="rounded-2xl border-2 border-black/10"
+                className={cn("rounded-2xl border-2 border-black/10", fieldWidthLg)}
                 disabled={!values.paymentRequired}
               />
             </div>
@@ -348,7 +353,10 @@ export function SessionForm({
               value={values.paymentInstructions}
               onChange={(e) => set("paymentInstructions", e.target.value)}
               rows={2}
-              className="w-full rounded-2xl border-2 border-black/10 bg-transparent px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+              className={cn(
+                "rounded-2xl border-2 border-black/10 bg-transparent px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60",
+                fieldWidth2xl
+              )}
               placeholder="Send payment to…"
               disabled={!values.paymentRequired}
             />
@@ -357,13 +365,13 @@ export function SessionForm({
         </CardContent>
       </Card>
 
-      <Card className="rounded-3xl border-2 border-black/10">
+      <Card className={adminCardClass}>
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Match Rules</CardTitle>
           <CardDescription>Scoring and side-change behavior</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 sm:max-w-md sm:grid-cols-3">
             <div className="space-y-2">
               <Label>Target score</Label>
               <IntegerInput
@@ -373,6 +381,7 @@ export function SessionForm({
                 max={99}
                 maxDigits={2}
                 fallback={15}
+                className={fieldWidthXs}
               />
             </div>
             <div className="space-y-2">
@@ -384,6 +393,7 @@ export function SessionForm({
                 max={20}
                 maxDigits={2}
                 fallback={2}
+                className={fieldWidthXs}
               />
             </div>
             <div className="space-y-2">
@@ -395,6 +405,7 @@ export function SessionForm({
                 max={Math.max(1, values.targetScore - 1)}
                 maxDigits={2}
                 fallback={8}
+                className={fieldWidthXs}
                 disabled={!values.allowSideChange}
               />
             </div>
@@ -408,7 +419,7 @@ export function SessionForm({
         </CardContent>
       </Card>
 
-      <Card className="rounded-3xl border-2 border-black/10">
+      <Card className={adminCardClass}>
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Court Settings</CardTitle>
           <CardDescription>
@@ -437,6 +448,7 @@ export function SessionForm({
               max={12}
               maxDigits={2}
               fallback={1}
+              className={fieldWidthSm}
             />
             <p className="text-xs text-muted-foreground">
               Creates Court 1, Court 2, … for the live queue and match
@@ -477,7 +489,7 @@ export function SessionForm({
               {values.courtSchedules.map((schedule, index) => (
                 <div
                   key={schedule.courtNumber}
-                  className="grid grid-cols-1 gap-2 border-t border-black/5 pt-3 first:border-t-0 first:pt-0 sm:grid-cols-[5rem_1fr_1fr]"
+                  className="grid grid-cols-1 gap-2 border-t border-black/5 pt-3 first:border-t-0 first:pt-0 sm:grid-cols-[5rem_minmax(0,9rem)_minmax(0,9rem)]"
                 >
                   <p className="pt-2 text-sm font-semibold text-sisclub-green-dark">
                     Court {schedule.courtNumber}
@@ -523,7 +535,7 @@ export function SessionForm({
         </CardContent>
       </Card>
 
-      <Card className="rounded-3xl border-2 border-black/10">
+      <Card className={adminCardClass}>
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Queue Settings</CardTitle>
           <CardDescription>Player matching and auto-assignment</CardDescription>
@@ -537,7 +549,7 @@ export function SessionForm({
                 set("skillMatchingMode", v as SkillMatchingMode)
               }
             >
-              <SelectTrigger className="rounded-2xl border-2 border-black/10">
+              <SelectTrigger className={cn("rounded-2xl border-2 border-black/10", fieldWidthLg)}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
