@@ -38,7 +38,7 @@ import {
   usePlayerProfile,
 } from "@/hooks/use-player-profile";
 import { getPlayerProfile } from "@/lib/player-profile";
-import { PLAYER_SKILL_LEVELS, PROFILE_GENDERS, normalizeProfileGender } from "@/lib/constants";
+import { PLAYER_SKILL_DESCRIPTIONS, PLAYER_SKILL_LEVELS, PROFILE_GENDERS, normalizeProfileGender } from "@/lib/constants";
 import { formatSessionDate } from "@/lib/sessions";
 import { cn } from "@/lib/utils";
 import { getPhilippineMobileError, parsePhilippineMobile } from "@/lib/phone";
@@ -346,6 +346,9 @@ function JoinForm() {
                       ))}
                     </SelectContent>
                   </Select>
+                  <p className="text-xs text-muted-foreground">
+                    {PLAYER_SKILL_DESCRIPTIONS[skillLevel]}
+                  </p>
                 </div>
 
                 <div className="space-y-2">

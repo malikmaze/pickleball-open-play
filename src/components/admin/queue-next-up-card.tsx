@@ -53,7 +53,9 @@ export function QueueNextUpCard({
             </CardTitle>
             <CardDescription className="mt-1">
               {nextMatch
-                ? "These four players are next if you assign from the queue."
+                ? nextMatch.isNewbieCourt
+                  ? "Newbie court — all four players are first-timers."
+                  : "Mixed skill — these four are next if you assign from the queue."
                 : needed > 0
                   ? `Need ${needed} more checked-in player${needed === 1 ? "" : "s"} before a match can start.`
                   : "Not enough eligible players in the queue right now."}

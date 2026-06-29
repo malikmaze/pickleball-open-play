@@ -24,7 +24,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { usePlayerProfile } from "@/hooks/use-player-profile";
-import { PLAYER_SKILL_LEVELS, PROFILE_GENDERS, normalizeProfileGender } from "@/lib/constants";
+import { PLAYER_SKILL_DESCRIPTIONS, PLAYER_SKILL_LEVELS, PROFILE_GENDERS, normalizeProfileGender } from "@/lib/constants";
 import { getPhilippineMobileError, parsePhilippineMobile } from "@/lib/phone";
 import { cn } from "@/lib/utils";
 import type { PlayerSkillLevel, ProfileGender } from "@/types";
@@ -164,6 +164,9 @@ function ProfileForm({
                     ))}
                   </SelectContent>
                 </Select>
+                <p className="text-xs text-muted-foreground">
+                  {PLAYER_SKILL_DESCRIPTIONS[skillLevel]}
+                </p>
               </div>
               <Button
                 type="submit"

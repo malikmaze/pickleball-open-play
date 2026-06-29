@@ -28,9 +28,6 @@ type StatusFilter = "all" | "pending" | "present" | "playing";
 const genderItems = Object.fromEntries(
   PROFILE_GENDERS.map((g) => [g, g])
 );
-const skillItems = Object.fromEntries(
-  PLAYER_SKILL_LEVELS.map((l) => [l, l])
-);
 
 interface PlayerRosterProps {
   players: Player[];
@@ -269,10 +266,10 @@ export function PlayerRoster({
 
                     <Select
                       value={player.skillLevel}
-                      items={skillItems}
-                      onValueChange={(v) =>
-                        onSkillChange(player.id, v as PlayerSkillLevel)
-                      }
+                      onValueChange={(v) => {
+                        if (!v) return;
+                        onSkillChange(player.id, v as PlayerSkillLevel);
+                      }}
                     >
                       <SelectTrigger className="h-8 w-full rounded-full sm:w-32">
                         <SelectValue />

@@ -42,9 +42,6 @@ import type { Player, PlayerSkillLevel, ProfileGender, Session } from "@/types";
 const genderItems = Object.fromEntries(
   PROFILE_GENDERS.map((g) => [g, g])
 );
-const skillItems = Object.fromEntries(
-  PLAYER_SKILL_LEVELS.map((level) => [level, level])
-);
 
 interface AddPlayerDialogProps {
   open: boolean;
@@ -220,7 +217,6 @@ export function AddPlayerDialog({
             <Label>Skill level</Label>
             <Select
               value={skillLevel}
-              items={skillItems}
               onValueChange={(v) => v && setSkillLevel(v as PlayerSkillLevel)}
             >
               <SelectTrigger className="rounded-2xl border-2 border-black/10">

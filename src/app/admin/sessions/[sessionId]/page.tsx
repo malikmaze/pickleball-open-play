@@ -206,10 +206,15 @@ function SessionAdminContent({ sessionId }: { sessionId: string }) {
     const supabase = createClient();
     try {
       await updatePlayerRecord(supabase, playerId, { skillLevel });
-      toast.success("Skill updated");
+      toast.success(`Skill updated to ${skillLevel}`);
       await load();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Update failed");
+      const message = err instanceof Error ? err.message : "Update failed";
+      toast.error(
+        message.includes("skill_level") || message.includes("check constraint")
+          ? `${message} — run migration 012_player_skill_newbie.sql in Supabase if Newbie was just added.`
+          : message
+      );
     }
   };
 
