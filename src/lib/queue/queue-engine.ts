@@ -1,16 +1,25 @@
 import { SKILL_NUMERIC } from "@/lib/constants";
-import type { PlayerSkillLevel, PlayerStatus, SkillMatchingMode } from "@/types";
+import {
+  buildQueueUnits,
+  getMutualPartner,
+  orderQueueForPartners,
+  pickFourFromQueueUnits,
+} from "@/lib/player-partners";
+import { getCompetitiveGenderTier } from "@/lib/player-gender";
+import type { PlayerSkillLevel, PlayerStatus, ProfileGender, SkillMatchingMode } from "@/types";
 
 export interface QueuePlayer {
   id: string;
   name: string;
   skillLevel: PlayerSkillLevel;
+  gender?: ProfileGender;
   status: PlayerStatus;
   gamesPlayed: number;
   checkedInAt: string | null;
   lastPlayedAt: string | null;
   joinedAt: string;
   isActive: boolean;
+  partnerId?: string | null;
 }
 
 export interface QueueSessionSettings {
@@ -28,14 +37,6 @@ export interface NextMatchAssignment {
   players: QueuePlayer[];
   teams: BalancedTeams;
 }
-
-const SKILL_COMPATIBILITY: Record<PlayerSkillLevel, PlayerSkillLevel[]> = {
-  Beginner: ["Beginner", "Novice"],
-  Novice: ["Beginner", "Novice", "Intermediate Low"],
-  "Intermediate Low": ["Novice", "Intermediate Low", "Intermediate High"],
-  "Intermediate High": ["Intermediate Low", "Intermediate High", "Advanced"],
-  Advanced: ["Intermediate High", "Advanced"],
-};
 
 import { waitingSinceTimestamp } from "@/lib/queue/wait-time";
 
@@ -58,12 +59,6 @@ function compareQueuePriority(a: QueuePlayer, b: QueuePlayer): number {
   return aWait - bWait;
 }
 
-function isSkillCompatible(a: PlayerSkillLevel, b: PlayerSkillLevel): boolean {
-  return (
-    SKILL_COMPATIBILITY[a].includes(b) || SKILL_COMPATIBILITY[b].includes(a)
-  );
-}
-
 function averageSkill(players: QueuePlayer[]): number {
   return (
     players.reduce((sum, p) => sum + skillValue(p.skillLevel), 0) /
@@ -71,28 +66,14 @@ function averageSkill(players: QueuePlayer[]): number {
   );
 }
 
-export function getEligiblePlayers(
-  players: QueuePlayer[],
-  settings: QueueSessionSettings
-): QueuePlayer[] {
-  const eligibleStatuses = ((): PlayerStatus[] => {
-    if (settings.paymentRequired) {
-      if (settings.allowUnpaidInQueue) {
-        return ["Registered", "Secured", "Present", "Waiting"];
-      }
-      return ["Secured", "Present", "Waiting"];
-    }
-    return ["Present", "Waiting"];
-  })();
+const QUEUE_STATUSES: PlayerStatus[] = ["Present", "Waiting"];
 
-  return players
-    .filter(
-      (p) =>
-        p.isActive &&
-        eligibleStatuses.includes(p.status) &&
-        p.status !== "Playing"
-    )
+/** Players eligible for the court queue — checked in only, fair order, partners grouped. */
+export function getEligiblePlayers(players: QueuePlayer[]): QueuePlayer[] {
+  const eligible = players
+    .filter((p) => p.isActive && QUEUE_STATUSES.includes(p.status))
     .sort(compareQueuePriority);
+  return orderQueueForPartners(eligible);
 }
 
 function groupSkillSpread(players: QueuePlayer[]): number {
@@ -100,60 +81,140 @@ function groupSkillSpread(players: QueuePlayer[]): number {
   return Math.max(...values) - Math.min(...values);
 }
 
-function pickCompatibleFour(
-  pool: QueuePlayer[],
-  mode: SkillMatchingMode = "Balanced"
-): QueuePlayer[] | null {
-  if (pool.length < 4) return null;
-
-  const sorted = [...pool].sort(compareQueuePriority);
-  const anchor = sorted[0];
-  const selected: QueuePlayer[] = [anchor];
-  const remaining = sorted.slice(1);
-
-  if (mode === "Flexible") {
-    return sorted.slice(0, 4);
-  }
-
-  for (const candidate of remaining) {
-    if (selected.length >= 4) break;
-    const compatibleWithAll = selected.every((p) =>
-      isSkillCompatible(p.skillLevel, candidate.skillLevel)
-    );
-    if (compatibleWithAll || mode === "Balanced" || selected.length >= 3) {
-      selected.push(candidate);
-    }
-  }
-
-  if (selected.length < 4) {
-    for (const candidate of remaining) {
-      if (selected.length >= 4) break;
-      if (!selected.includes(candidate)) selected.push(candidate);
-    }
-  }
-
-  if (mode === "Strict" && selected.length === 4) {
-    const spread = groupSkillSpread(selected);
-    if (spread > 2) return null;
-  }
-
-  return selected.length === 4 ? selected : null;
-}
-
 export function selectNextFourPlayers(
   players: QueuePlayer[],
   settings: QueueSessionSettings
 ): QueuePlayer[] | null {
-  const eligible = getEligiblePlayers(players, settings);
+  const eligible = getEligiblePlayers(players);
   if (eligible.length < 4) return null;
 
   const mode = settings.skillMatchingMode ?? "Balanced";
-  const ideal = pickCompatibleFour(eligible, mode);
-  if (ideal) return ideal;
+  const units = buildQueueUnits(eligible);
+  const picked = pickFourFromQueueUnits(units);
 
-  if (mode === "Strict") return null;
+  if (!picked) return null;
 
-  return eligible.slice(0, 4);
+  if (mode === "Strict" && groupSkillSpread(picked) > 2) {
+    return null;
+  }
+
+  return picked;
+}
+
+function pairGenderPenalty(team: [QueuePlayer, QueuePlayer]): number {
+  const tiers = team.map((p) => getCompetitiveGenderTier(p.gender));
+  const maleTier = tiers.filter((t) => t === "male").length;
+  const femaleTier = tiers.filter((t) => t === "female").length;
+  if (maleTier === 1 && femaleTier === 1) return 0;
+  if (tiers.every((t) => t === "unknown")) return 0;
+  if (tiers.some((t) => t === "unknown")) return 0.5;
+  return 1;
+}
+
+const TEAM_SPLITS: [[number, number], [number, number]][] = [
+  [
+    [0, 3],
+    [1, 2],
+  ],
+  [
+    [0, 2],
+    [1, 3],
+  ],
+  [
+    [0, 1],
+    [2, 3],
+  ],
+];
+
+function scoreTeamPartition(
+  sorted: QueuePlayer[],
+  teamAIdx: [number, number],
+  teamBIdx: [number, number]
+): number {
+  const teamA: [QueuePlayer, QueuePlayer] = [
+    sorted[teamAIdx[0]],
+    sorted[teamAIdx[1]],
+  ];
+  const teamB: [QueuePlayer, QueuePlayer] = [
+    sorted[teamBIdx[0]],
+    sorted[teamBIdx[1]],
+  ];
+  const skillDiff = Math.abs(averageSkill(teamA) - averageSkill(teamB));
+  const genderPenalty = pairGenderPenalty(teamA) + pairGenderPenalty(teamB);
+  return skillDiff * 2 + genderPenalty;
+}
+
+function bestSkillGenderSplit(sorted: QueuePlayer[]): BalancedTeams {
+  let best: BalancedTeams = {
+    teamA: [sorted[0], sorted[3]],
+    teamB: [sorted[1], sorted[2]],
+  };
+  let bestScore = Infinity;
+
+  for (const [teamAIdx, teamBIdx] of TEAM_SPLITS) {
+    const score = scoreTeamPartition(sorted, teamAIdx, teamBIdx);
+    if (score < bestScore) {
+      bestScore = score;
+      best = {
+        teamA: [sorted[teamAIdx[0]], sorted[teamAIdx[1]]],
+        teamB: [sorted[teamBIdx[0]], sorted[teamBIdx[1]]],
+      };
+    }
+  }
+
+  return best;
+}
+
+function pairOthersWithPartner(
+  partnerPair: [QueuePlayer, QueuePlayer],
+  others: [QueuePlayer, QueuePlayer]
+): BalancedTeams {
+  const [o1, o2] = others;
+  const options: BalancedTeams[] = [
+    { teamA: partnerPair, teamB: [o1, o2] },
+    { teamA: [partnerPair[0], o1], teamB: [partnerPair[1], o2] },
+    { teamA: [partnerPair[0], o2], teamB: [partnerPair[1], o1] },
+  ];
+
+  let best = options[0];
+  let bestScore = Infinity;
+  for (const option of options) {
+    const score =
+      Math.abs(averageSkill(option.teamA) - averageSkill(option.teamB)) * 2 +
+      pairGenderPenalty(option.teamA) +
+      pairGenderPenalty(option.teamB);
+    if (score < bestScore) {
+      bestScore = score;
+      best = option;
+    }
+  }
+  return best;
+}
+
+function pairTeamsFromPartners(players: QueuePlayer[]): BalancedTeams | null {
+  const pairs: [QueuePlayer, QueuePlayer][] = [];
+  const used = new Set<string>();
+
+  for (const player of players) {
+    if (used.has(player.id)) continue;
+    const partner = getMutualPartner(player, players);
+    if (!partner || used.has(partner.id)) continue;
+    used.add(player.id);
+    used.add(partner.id);
+    pairs.push([player, partner]);
+  }
+
+  if (pairs.length === 2) {
+    return { teamA: pairs[0], teamB: pairs[1] };
+  }
+
+  if (pairs.length === 1) {
+    const others = players.filter((p) => !used.has(p.id));
+    if (others.length !== 2) return null;
+    return pairOthersWithPartner(pairs[0], [others[0], others[1]]);
+  }
+
+  return null;
 }
 
 export function balanceTeams(players: QueuePlayer[]): BalancedTeams {
@@ -161,24 +222,14 @@ export function balanceTeams(players: QueuePlayer[]): BalancedTeams {
     throw new Error("balanceTeams requires exactly 4 players");
   }
 
+  const partnerTeams = pairTeamsFromPartners(players);
+  if (partnerTeams) return partnerTeams;
+
   const sorted = [...players].sort(
     (a, b) => skillValue(b.skillLevel) - skillValue(a.skillLevel)
   );
 
-  const teamA: [QueuePlayer, QueuePlayer] = [sorted[0], sorted[3]];
-  const teamB: [QueuePlayer, QueuePlayer] = [sorted[1], sorted[2]];
-
-  const teamAAvg = averageSkill(teamA);
-  const teamBAvg = averageSkill(teamB);
-
-  if (Math.abs(teamAAvg - teamBAvg) > 1.5) {
-    return {
-      teamA: [sorted[0], sorted[2]],
-      teamB: [sorted[1], sorted[3]],
-    };
-  }
-
-  return { teamA, teamB };
+  return bestSkillGenderSplit(sorted);
 }
 
 export function createNextMatchForCourt(
@@ -195,10 +246,9 @@ export function createNextMatchForCourt(
 
 export function getQueuePosition(
   players: QueuePlayer[],
-  playerId: string,
-  settings: QueueSessionSettings
+  playerId: string
 ): number | null {
-  const eligible = getEligiblePlayers(players, settings);
+  const eligible = getEligiblePlayers(players);
   const index = eligible.findIndex((p) => p.id === playerId);
   return index === -1 ? null : index + 1;
 }
@@ -246,22 +296,32 @@ export function toQueuePlayer(player: {
   id: string;
   name: string;
   skillLevel: PlayerSkillLevel;
+  gender?: ProfileGender;
   status: PlayerStatus;
   gamesPlayed: number;
   checkedInAt?: string;
   lastPlayedAt?: string;
   joinedAt: string;
   isActive: boolean;
+  partnerId?: string | null;
 }): QueuePlayer {
   return {
     id: player.id,
     name: player.name,
     skillLevel: player.skillLevel,
+    gender: player.gender,
     status: player.status,
     gamesPlayed: player.gamesPlayed,
     checkedInAt: player.checkedInAt ?? null,
     lastPlayedAt: player.lastPlayedAt ?? null,
     joinedAt: player.joinedAt,
     isActive: player.isActive,
+    partnerId: player.partnerId ?? null,
   };
+}
+
+export function formatTeamsPreview(assignment: NextMatchAssignment): string {
+  const [a1, a2] = assignment.teams.teamA;
+  const [b1, b2] = assignment.teams.teamB;
+  return `A: ${a1.name} & ${a2.name} · B: ${b1.name} & ${b2.name}`;
 }

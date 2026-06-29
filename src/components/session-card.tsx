@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/card";
 import { FreeSessionBadge } from "@/components/free-session-badge";
 import { SkillBadge, StatusBadge } from "@/components/status-badge";
+import { formatSessionCourtsLabel } from "@/lib/court-schedule";
 import { formatSessionDate, isSessionPast } from "@/lib/sessions";
 import { cn } from "@/lib/utils";
 
@@ -130,7 +131,7 @@ export function SessionCard({
         <div className="flex items-center gap-2 text-foreground/80">
           <MapPin className="h-4 w-4 shrink-0 text-sisclub-green" />
           <span>
-            {session.location} · {session.courtNumber}
+            {session.location} · {formatSessionCourtsLabel(session.courtCount)}
           </span>
         </div>
         <div className="flex items-center gap-2 text-foreground/80">

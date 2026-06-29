@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
-import { AppHeader } from "@/components/app-header";
-import { SessionAdminTabs } from "@/components/admin/session-tabs";
+import { AdminSessionChrome } from "@/components/admin/session-chrome";
 import { CourtsLiveView } from "@/components/courts/courts-live-view";
 import { PageShell } from "@/components/page-shell";
 
@@ -20,11 +19,13 @@ export default function AdminCourtsPage({
 
   return (
     <PageShell size="wide">
-      <AppHeader subtitle="Manage courts" backHref="/admin" size="wide" />
-      <div className="py-4 sm:py-6">
-        {sessionId ? (
-          <>
-            <SessionAdminTabs sessionId={sessionId} />
+      {sessionId ? (
+        <>
+          <AdminSessionChrome
+            sessionId={sessionId}
+            subtitle="Manage courts"
+          />
+          <div className="py-4 sm:py-5">
             <CourtsLiveView
               sessionId={sessionId}
               isAdmin
@@ -39,11 +40,13 @@ export default function AdminCourtsPage({
                 </div>
               }
             />
-          </>
-        ) : (
-          <Loader2 className="mx-auto h-8 w-8 animate-spin text-sisclub-green" />
-        )}
-      </div>
+          </div>
+        </>
+      ) : (
+        <div className="flex justify-center py-20">
+          <Loader2 className="h-8 w-8 animate-spin text-sisclub-green" />
+        </div>
+      )}
     </PageShell>
   );
 }

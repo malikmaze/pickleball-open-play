@@ -35,19 +35,23 @@ export const PLAYER_STATUSES: PlayerStatus[] = [
 ];
 
 export const PROFILE_GENDERS = [
-  "Woman",
-  "Man",
-  "Non-binary",
-  "Prefer not to say",
+  "Male",
+  "Female",
+  "Others",
 ] as const satisfies readonly ProfileGender[];
 
-export const DEFAULT_PROFILE_GENDER: ProfileGender = "Prefer not to say";
+export const DEFAULT_PROFILE_GENDER: ProfileGender = "Others";
 
 export function normalizeProfileGender(value?: string | null): ProfileGender {
-  if (value === "Male") return "Man";
-  if (value === "Female") return "Woman";
-  if (PROFILE_GENDERS.includes(value as ProfileGender)) {
-    return value as ProfileGender;
+  if (!value) return DEFAULT_PROFILE_GENDER;
+  if (value === "Male" || value === "Female" || value === "Others") {
+    return value;
+  }
+  if (value === "Man" || value === "Woman") {
+    return value === "Man" ? "Male" : "Female";
+  }
+  if (value === "Non-binary" || value === "Prefer not to say") {
+    return "Others";
   }
   return DEFAULT_PROFILE_GENDER;
 }

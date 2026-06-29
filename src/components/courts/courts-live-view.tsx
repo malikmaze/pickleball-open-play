@@ -9,6 +9,7 @@ import { QueuePanel } from "@/components/live/queue-panel";
 import { WinnerHistory } from "@/components/live/winner-history";
 import { LiveSessionHeader } from "@/components/live/live-session-header";
 import { CourtLiveCard } from "@/components/courts/court-live-card";
+import { CourtSessionStats } from "@/components/courts/court-session-stats";
 import {
   createNextMatchForCourt,
   getEligiblePlayers,
@@ -16,6 +17,11 @@ import {
   toQueuePlayer,
   validateMatchScore,
 } from "@/lib/queue/queue-engine";
+import {
+  courtRentalUnavailableCopy,
+  getCourtRentalStatus,
+  isCourtRentalActive,
+} from "@/lib/court-schedule";
 import { getQueueSessionSettings } from "@/lib/sessions";
 import { createClient } from "@/utils/supabase/client";
 import {
@@ -56,6 +62,12 @@ export function CourtsLiveView({
   const [scores, setScores] = useState<Record<string, { a: string; b: string }>>({});
   const [winnerFlash, setWinnerFlash] = useState<Record<string, "A" | "B" | null>>({});
   const [busyCourt, setBusyCourt] = useState<string | null>(null);
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    const interval = setInterval(() => setNow(new Date()), 30_000);
+    return () => clearInterval(interval);
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -89,21 +101,15 @@ export function CourtsLiveView({
 
   const queuePlayers = useMemo(() => {
     if (!session) return [];
-    return getEligiblePlayers(
-      session.players.map((p) => toQueuePlayer(p)),
-      queueSettings(session)
-    );
+    return getEligiblePlayers(session.players.map((p) => toQueuePlayer(p)));
   }, [session]);
 
-  const nextPreview = useMemo(() => {
+  const nextAssignment = useMemo(() => {
     if (!session) return null;
-    const assignment = previewNextMatch(
+    return previewNextMatch(
       session.players.map((p) => toQueuePlayer(p)),
       queueSettings(session)
     );
-    if (!assignment) return null;
-    const names = assignment.players.map((p) => p.name).join(", ");
-    return names;
   }, [session]);
 
   const finishedByCourt = useMemo(() => {
@@ -120,6 +126,11 @@ export function CourtsLiveView({
 
   const handleAssign = async (court: Court) => {
     if (!session) return;
+    const rentalStatus = getCourtRentalStatus(court, session, now);
+    if (!rentalStatus.available) {
+      toast.error(courtRentalUnavailableCopy(rentalStatus));
+      return;
+    }
     setBusyCourt(court.id);
     try {
       const supabase = createClient();
@@ -142,7 +153,7 @@ export function CourtsLiveView({
         teamBPlayer2Id: b2.id,
       });
       setCourtMatches((prev) => ({ ...prev, [court.id]: match }));
-      toast.success(`Match assigned to Court ${court.courtNumber}`);
+      toast.success(`Next match assigned to Court ${court.courtNumber}`);
       await load();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Assign failed");
@@ -152,6 +163,12 @@ export function CourtsLiveView({
   };
 
   const handleStart = async (court: Court, match: Match) => {
+    if (!session) return;
+    const rentalStatus = getCourtRentalStatus(court, session, now);
+    if (!rentalStatus.available) {
+      toast.error(courtRentalUnavailableCopy(rentalStatus));
+      return;
+    }
     setBusyCourt(court.id);
     try {
       const supabase = createClient();
@@ -229,11 +246,10 @@ export function CourtsLiveView({
       toast.success(`Court ${court.courtNumber} winner: Team ${result.winner}`);
       setTimeout(async () => {
         const supabase = createClient();
-        const autoMatch = await resetCourtAfterMatch(
-          supabase,
-          court.id,
-          session
-        );
+        const autoMatch =
+          isCourtRentalActive(court, session, now)
+            ? await resetCourtAfterMatch(supabase, court.id, session)
+            : null;
         setWinnerFlash((prev) => ({ ...prev, [court.id]: null }));
         if (autoMatch) {
           toast.success(
@@ -292,7 +308,7 @@ export function CourtsLiveView({
         court.courtNumber,
         match?.id,
         playerIds,
-        session ?? undefined
+        session && isCourtRentalActive(court, session, now) ? session : undefined
       );
       if (autoMatch) {
         toast.success(
@@ -324,75 +340,93 @@ export function CourtsLiveView({
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        {header ?? (
-          showSidePanels && session ? (
-            <LiveSessionHeader session={session} />
-          ) : (
-            <div>
-              <h2 className="font-heading text-xl font-bold text-sisclub-green-dark sm:text-2xl">
-                Live Courts
-              </h2>
-              <p className="text-sm text-muted-foreground">{session.title}</p>
+    <div className="space-y-5">
+      {!showSidePanels ? (
+        <section className="overflow-hidden rounded-3xl border-2 border-black/10 bg-white shadow-sm">
+          <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5 sm:py-5">
+            <div className="min-w-0 flex-1">
+              {header ?? (
+                <>
+                  <h2 className="font-heading text-xl font-bold text-sisclub-green-dark sm:text-2xl">
+                    Live Courts
+                  </h2>
+                  <p className="mt-0.5 text-sm text-muted-foreground">
+                    {session.title}
+                  </p>
+                </>
+              )}
             </div>
-          )
-        )}
-        <Button
-          variant="outline"
-          onClick={() => load()}
-          className="rounded-full"
-          disabled={loading}
-        >
-          <RefreshCw className={loading ? "mr-1 h-4 w-4 animate-spin" : "mr-1 h-4 w-4"} />
-          Refresh
-        </Button>
-      </div>
-
-      {!showSidePanels && (
-      <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 scrollbar-none sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0 rounded-2xl border-2 border-sisclub-green-dark/15 bg-sisclub-green-dark p-3 text-white shadow-md">
-        {[
-          { label: "Game to", value: `${session.targetScore}` },
-          { label: "Win by", value: `${session.winBy}` },
-          { label: "Courts", value: `${session.courtCount}` },
-          {
-            label: "Auto assign",
-            value: session.autoAssignNextMatch ? "ON" : "OFF",
-            highlight: session.autoAssignNextMatch,
-          },
-          {
-            label: "Payment",
-            value: session.paymentRequired ? "Required" : "No",
-          },
-          {
-            label: "Checked in",
-            value: `${session.players.filter((p) => ["Present", "Waiting", "Playing", "Secured"].includes(p.status)).length} / ${session.maxPlayers}`,
-          },
-        ].map((stat) => (
-          <div
-            key={stat.label}
-            className="flex min-w-[5.5rem] shrink-0 flex-col rounded-xl bg-white/10 px-3 py-2 sm:min-w-[88px] sm:flex-1"
-          >
-            <span className="text-[10px] uppercase tracking-wide text-white/60">
-              {stat.label}
-            </span>
-            <span
-              className={
-                "highlight" in stat && stat.highlight
-                  ? "font-semibold text-emerald-300"
-                  : "font-semibold"
-              }
+            <Button
+              variant="outline"
+              onClick={() => load()}
+              className="w-full shrink-0 rounded-full sm:w-auto"
+              disabled={loading}
             >
-              {stat.value}
-            </span>
+              <RefreshCw
+                className={
+                  loading ? "mr-1.5 h-4 w-4 animate-spin" : "mr-1.5 h-4 w-4"
+                }
+              />
+              Refresh
+            </Button>
           </div>
-        ))}
-      </div>
+          <CourtSessionStats
+            flush
+            stats={[
+              { label: "Game to", value: `${session.targetScore}` },
+              { label: "Win by", value: `${session.winBy}` },
+              { label: "Courts", value: `${session.courtCount}` },
+              {
+                label: "Auto assign",
+                value: session.autoAssignNextMatch ? "ON" : "OFF",
+                highlight: session.autoAssignNextMatch,
+              },
+              {
+                label: "Payment",
+                value: session.paymentRequired ? "Required" : "No",
+              },
+              {
+                label: "Checked in",
+                value: `${session.players.filter((p) => ["Present", "Waiting", "Playing", "Secured"].includes(p.status)).length} / ${session.maxPlayers}`,
+              },
+            ]}
+          />
+        </section>
+      ) : (
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            {header ?? (
+              showSidePanels && session ? (
+                <LiveSessionHeader session={session} />
+              ) : (
+                <>
+                  <h2 className="font-heading text-xl font-bold text-sisclub-green-dark sm:text-2xl">
+                    Live Courts
+                  </h2>
+                  <p className="text-sm text-muted-foreground">{session.title}</p>
+                </>
+              )
+            )}
+          </div>
+          <Button
+            variant="outline"
+            onClick={() => load()}
+            className="w-full shrink-0 rounded-full sm:w-auto"
+            disabled={loading}
+          >
+            <RefreshCw
+              className={
+                loading ? "mr-1.5 h-4 w-4 animate-spin" : "mr-1.5 h-4 w-4"
+              }
+            />
+            Refresh
+          </Button>
+        </div>
       )}
 
       <div className={showSidePanels ? "grid gap-6 lg:grid-cols-[1fr_minmax(260px,320px)]" : ""}>
-        <div className="space-y-6">
-      <div className="grid gap-4 sm:gap-6 md:grid-cols-2">
+        <div className="space-y-5">
+      <div className="grid items-stretch gap-4 sm:gap-5 md:grid-cols-2">
         {courts.map((court) => {
           const match = courtMatches[court.id];
           const finishedMatch =
@@ -413,12 +447,16 @@ export function CourtsLiveView({
               busy={busyCourt === court.id}
               winnerFlash={winnerFlash[court.id] ?? null}
               scoreInput={score}
-              nextMatchPreview={
-                isAdmin && !match && court.status === "Empty"
-                  ? nextPreview ?? undefined
+              nextMatch={
+                !match &&
+                court.status === "Empty" &&
+                isCourtRentalActive(court, session, now)
+                  ? nextAssignment
                   : undefined
               }
+              queueCount={queuePlayers.length}
               highlightPlayerId={highlightPlayerId}
+              now={now}
               onScoreChange={(a, b) =>
                 setScores((s) => ({ ...s, [court.id]: { a, b } }))
               }
@@ -437,6 +475,7 @@ export function CourtsLiveView({
         <div className="grid gap-4 md:grid-cols-2">
           <QueuePanel
             players={queuePlayers}
+            partnerPool={session.players}
             highlightPlayerId={highlightPlayerId}
           />
 
@@ -451,6 +490,7 @@ export function CourtsLiveView({
           <div className="space-y-4">
             <QueuePanel
             players={queuePlayers}
+            partnerPool={session.players}
             highlightPlayerId={highlightPlayerId}
           />
             <WinnerHistory
