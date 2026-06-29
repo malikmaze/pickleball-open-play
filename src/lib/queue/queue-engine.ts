@@ -6,6 +6,7 @@ import {
   pickFourFromQueueUnits,
 } from "@/lib/player-partners";
 import { getCompetitiveGenderTier } from "@/lib/player-gender";
+import { waitingSinceTimestamp } from "@/lib/queue/wait-time";
 import type { PlayerSkillLevel, PlayerStatus, ProfileGender, SkillMatchingMode } from "@/types";
 
 export interface QueuePlayer {
@@ -36,9 +37,9 @@ export interface BalancedTeams {
 export interface NextMatchAssignment {
   players: QueuePlayer[];
   teams: BalancedTeams;
+  /** True when all four players are Newbie (protected lane). */
+  isNewbieCourt?: boolean;
 }
-
-import { waitingSinceTimestamp } from "@/lib/queue/wait-time";
 
 function skillValue(level: PlayerSkillLevel): number {
   return SKILL_NUMERIC[level];
@@ -81,6 +82,90 @@ function groupSkillSpread(players: QueuePlayer[]): number {
   return Math.max(...values) - Math.min(...values);
 }
 
+export function isNewbiePlayer(player: Pick<QueuePlayer, "skillLevel">): boolean {
+  return player.skillLevel === "Newbie";
+}
+
+export function countNewbiesInQueue(players: QueuePlayer[]): number {
+  return getEligiblePlayers(players).filter(isNewbiePlayer).length;
+}
+
+function isNewbieUnit(unit: QueuePlayer[]): boolean {
+  return unit.every(isNewbiePlayer);
+}
+
+function countPlayersInUnits(units: QueuePlayer[][]): number {
+  return units.reduce((sum, unit) => sum + unit.length, 0);
+}
+
+export function partitionNewbieUnits(units: QueuePlayer[][]): {
+  newbieUnits: QueuePlayer[][];
+  mainUnits: QueuePlayer[][];
+} {
+  const newbieUnits: QueuePlayer[][] = [];
+  const mainUnits: QueuePlayer[][] = [];
+  for (const unit of units) {
+    if (isNewbieUnit(unit)) newbieUnits.push(unit);
+    else mainUnits.push(unit);
+  }
+  return { newbieUnits, mainUnits };
+}
+
+export function maxSkillSpreadForMode(mode: SkillMatchingMode): number {
+  switch (mode) {
+    case "Strict":
+      return 1;
+    case "Flexible":
+      return 3;
+    default:
+      return 2;
+  }
+}
+
+/** Pick four players respecting partner units and a max skill spread; prefers earlier queue units. */
+export function pickFourWithSkillSpread(
+  units: QueuePlayer[][],
+  maxSpread: number
+): QueuePlayer[] | null {
+  let bestPlayers: QueuePlayer[] | null = null;
+  let bestIndexScore = Infinity;
+
+  function remainingCapacity(fromIdx: number): number {
+    let count = 0;
+    for (let i = fromIdx; i < units.length; i++) count += units[i].length;
+    return count;
+  }
+
+  function search(
+    idx: number,
+    selected: QueuePlayer[],
+    usedUnitIndices: number[]
+  ): void {
+    if (selected.length === 4) {
+      if (groupSkillSpread(selected) <= maxSpread) {
+        const indexScore = usedUnitIndices.reduce((sum, i) => sum + i, 0);
+        if (indexScore < bestIndexScore) {
+          bestIndexScore = indexScore;
+          bestPlayers = selected;
+        }
+      }
+      return;
+    }
+    if (idx >= units.length) return;
+    if (selected.length + remainingCapacity(idx) < 4) return;
+
+    search(idx + 1, selected, usedUnitIndices);
+
+    const unit = units[idx];
+    if (selected.length + unit.length <= 4) {
+      search(idx + 1, [...selected, ...unit], [...usedUnitIndices, idx]);
+    }
+  }
+
+  search(0, [], []);
+  return bestPlayers;
+}
+
 export function selectNextFourPlayers(
   players: QueuePlayer[],
   settings: QueueSessionSettings
@@ -90,15 +175,17 @@ export function selectNextFourPlayers(
 
   const mode = settings.skillMatchingMode ?? "Balanced";
   const units = buildQueueUnits(eligible);
-  const picked = pickFourFromQueueUnits(units);
+  const { newbieUnits } = partitionNewbieUnits(units);
 
-  if (!picked) return null;
-
-  if (mode === "Strict" && groupSkillSpread(picked) > 2) {
-    return null;
+  if (countPlayersInUnits(newbieUnits) >= 4) {
+    return pickFourFromQueueUnits(newbieUnits);
   }
 
-  return picked;
+  return pickFourWithSkillSpread(units, maxSkillSpreadForMode(mode));
+}
+
+export function isNewbieOnlyGroup(players: QueuePlayer[]): boolean {
+  return players.length === 4 && players.every(isNewbiePlayer);
 }
 
 function pairGenderPenalty(team: [QueuePlayer, QueuePlayer]): number {
@@ -241,6 +328,7 @@ export function createNextMatchForCourt(
   return {
     players: selected,
     teams: balanceTeams(selected),
+    isNewbieCourt: isNewbieOnlyGroup(selected),
   };
 }
 

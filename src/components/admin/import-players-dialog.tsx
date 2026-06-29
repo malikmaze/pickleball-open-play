@@ -29,10 +29,6 @@ import { createClient } from "@/utils/supabase/client";
 import { importPlayersRecord } from "@/utils/supabase/queries";
 import type { PlayerSkillLevel, Session } from "@/types";
 
-const skillItems = Object.fromEntries(
-  PLAYER_SKILL_LEVELS.map((level) => [level, level])
-);
-
 export function ImportPlayersDialog({
   open,
   onOpenChange,
@@ -149,7 +145,6 @@ export function ImportPlayersDialog({
             <Label>Default skill (when not specified)</Label>
             <Select
               value={defaultSkill}
-              items={skillItems}
               onValueChange={(v) => v && setDefaultSkill(v as PlayerSkillLevel)}
             >
               <SelectTrigger className="rounded-2xl border-2 border-black/10">

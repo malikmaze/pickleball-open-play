@@ -38,11 +38,16 @@ insert into public.admins (email) values ('your-email@example.com');
 
 ### Queue system
 
-Fair ordering in `src/lib/queue/queue-engine.ts`:
+Fair ordering and skill-aware matching are documented in **[docs/MATCHING-ENGINE.md](docs/MATCHING-ENGINE.md)**.
+
+Summary (see doc for full detail):
 
 1. Fewest games played
 2. Longest waiting (`checked_in_at` / `last_played_at`)
-3. Join order
+3. Newbie lane when 4+ Newbies are waiting
+4. Skill spread limits (Strict / Balanced / Flexible) for main pool
+
+**Player-facing guide:** [docs/OPEN-PLAY-GUIDE.md](docs/OPEN-PLAY-GUIDE.md) — share with your group.
 
 ### Activity feed
 
@@ -87,6 +92,7 @@ In Supabase **SQL Editor**:
 9. `supabase/migrations/009_secure_admin_check.sql` — `is_admin()` RPC; lock down direct `admins` reads
 10. `supabase/migrations/010_player_withdraw_rls.sql` — withdraw before check-in; admin can remove
 11. `supabase/migrations/011_anonymous_open_play.sql` — join open play without accounts
+12. `supabase/migrations/012_player_skill_newbie.sql` — add **Newbie** player skill level
 
 ### 2. Environment variables
 
