@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Loader2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { CourtAnnouncementToggle } from "@/components/courts/court-announcement-toggle";
 import { ActivityFeed } from "@/components/live/activity-feed";
 import { QueuePanel } from "@/components/live/queue-panel";
 import { WinnerHistory } from "@/components/live/winner-history";
@@ -23,6 +24,12 @@ import {
   isCourtRentalActive,
 } from "@/lib/court-schedule";
 import { getQueueSessionSettings } from "@/lib/sessions";
+import {
+  announceCourtCall,
+  announceMatchWinner,
+  isCourtAnnouncementsEnabled,
+} from "@/lib/court-announcement";
+import { useCourtAnnouncements } from "@/hooks/use-court-announcements";
 import { createClient } from "@/utils/supabase/client";
 import {
   changeCourtSidesRecord,
@@ -62,7 +69,19 @@ export function CourtsLiveView({
   const [scores, setScores] = useState<Record<string, { a: string; b: string }>>({});
   const [winnerFlash, setWinnerFlash] = useState<Record<string, "A" | "B" | null>>({});
   const [busyCourt, setBusyCourt] = useState<string | null>(null);
+  const [announcementsOn, setAnnouncementsOn] = useState(() =>
+    isCourtAnnouncementsEnabled()
+  );
+  const skipNextCourtPollAnnounce = useRef(false);
+  const skipNextWinnerPollAnnounce = useRef(false);
   const [now, setNow] = useState(() => new Date());
+
+  useCourtAnnouncements(
+    bundle?.activityLogs,
+    announcementsOn,
+    skipNextCourtPollAnnounce,
+    skipNextWinnerPollAnnounce
+  );
 
   useEffect(() => {
     const interval = setInterval(() => setNow(new Date()), 30_000);
@@ -154,6 +173,16 @@ export function CourtsLiveView({
       });
       setCourtMatches((prev) => ({ ...prev, [court.id]: match }));
       toast.success(`Next match assigned to Court ${court.courtNumber}`);
+
+      if (isCourtAnnouncementsEnabled()) {
+        announceCourtCall({
+          courtNumber: court.courtNumber,
+          teamA: [a1.name, a2.name],
+          teamB: [b1.name, b2.name],
+        });
+        skipNextCourtPollAnnounce.current = true;
+      }
+
       await load();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Assign failed");
@@ -244,6 +273,27 @@ export function CourtsLiveView({
       );
       setWinnerFlash((prev) => ({ ...prev, [court.id]: result.winner! }));
       toast.success(`Court ${court.courtNumber} winner: Team ${result.winner}`);
+
+      if (isCourtAnnouncementsEnabled()) {
+        const winnerIds =
+          result.winner === "A"
+            ? [match.teamAPlayer1Id, match.teamAPlayer2Id]
+            : [match.teamBPlayer1Id, match.teamBPlayer2Id];
+        const winnerNames = winnerIds
+          .map((id) => session.players.find((p) => p.id === id)?.name)
+          .filter((name): name is string => Boolean(name));
+
+        if (winnerNames.length === 2) {
+          announceMatchWinner({
+            courtNumber: court.courtNumber,
+            winners: [winnerNames[0], winnerNames[1]],
+            teamAScore,
+            teamBScore,
+          });
+          skipNextWinnerPollAnnounce.current = true;
+        }
+      }
+
       setTimeout(async () => {
         const supabase = createClient();
         const autoMatch =
@@ -356,19 +406,24 @@ export function CourtsLiveView({
                 </>
               )}
             </div>
-            <Button
-              variant="outline"
-              onClick={() => load()}
-              className="w-full shrink-0 rounded-full sm:w-auto"
-              disabled={loading}
-            >
-              <RefreshCw
-                className={
-                  loading ? "mr-1.5 h-4 w-4 animate-spin" : "mr-1.5 h-4 w-4"
-                }
+            <div className="flex w-full shrink-0 flex-wrap gap-2 sm:w-auto">
+              <CourtAnnouncementToggle
+                onEnabledChange={setAnnouncementsOn}
               />
-              Refresh
-            </Button>
+              <Button
+                variant="outline"
+                onClick={() => load()}
+                className="flex-1 rounded-full sm:flex-none"
+                disabled={loading}
+              >
+                <RefreshCw
+                  className={
+                    loading ? "mr-1.5 h-4 w-4 animate-spin" : "mr-1.5 h-4 w-4"
+                  }
+                />
+                Refresh
+              </Button>
+            </div>
           </div>
           <CourtSessionStats
             flush
@@ -408,19 +463,22 @@ export function CourtsLiveView({
               )
             )}
           </div>
-          <Button
-            variant="outline"
-            onClick={() => load()}
-            className="w-full shrink-0 rounded-full sm:w-auto"
-            disabled={loading}
-          >
-            <RefreshCw
-              className={
-                loading ? "mr-1.5 h-4 w-4 animate-spin" : "mr-1.5 h-4 w-4"
-              }
-            />
-            Refresh
-          </Button>
+          <div className="flex w-full shrink-0 flex-wrap gap-2 sm:w-auto">
+            <CourtAnnouncementToggle onEnabledChange={setAnnouncementsOn} />
+            <Button
+              variant="outline"
+              onClick={() => load()}
+              className="flex-1 rounded-full sm:flex-none"
+              disabled={loading}
+            >
+              <RefreshCw
+                className={
+                  loading ? "mr-1.5 h-4 w-4 animate-spin" : "mr-1.5 h-4 w-4"
+                }
+              />
+              Refresh
+            </Button>
+          </div>
         </div>
       )}
 
