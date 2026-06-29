@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import type { QueuePlayer } from "@/lib/queue/queue-engine";
+import { countNewbiesInQueue, isNewbiePlayer } from "@/lib/queue/queue-engine";
 import { groupAdjacentQueuePartners } from "@/lib/player-partners";
 import { formatWaitingTime } from "@/lib/queue/wait-time";
 import { cn } from "@/lib/utils";
@@ -77,7 +78,14 @@ function QueueRow({
             Next up
           </span>
         )}
-        <span className="rounded-full bg-sisclub-pink-soft px-2 py-0.5 text-[10px] font-semibold text-sisclub-pink-dark">
+        <span
+          className={cn(
+            "rounded-full px-2 py-0.5 text-[10px] font-semibold",
+            isNewbiePlayer(player)
+              ? "bg-sky-100 text-sky-800"
+              : "bg-sisclub-pink-soft text-sisclub-pink-dark"
+          )}
+        >
           {player.skillLevel}
         </span>
         {onRemove && (
@@ -121,6 +129,7 @@ export function QueuePanel({
 }) {
   const groups = groupAdjacentQueuePartners(players);
   const hasPartnerPairs = groups.some((group) => group.kind === "pair");
+  const newbieCount = countNewbiesInQueue(players);
 
   return (
     <Card
@@ -135,6 +144,13 @@ export function QueuePanel({
           <CardTitle className="text-base">Queue</CardTitle>
           <CardDescription className="mt-0.5 text-xs">
             Fair order by games played and wait time since check-in.
+            {newbieCount > 0 && (
+              <>
+                {" "}
+                · {newbieCount} Newbie{newbieCount === 1 ? "" : "s"} waiting
+                {newbieCount >= 4 ? " (next court is newbie-only)" : ""}
+              </>
+            )}
           </CardDescription>
         </div>
         <div className="flex shrink-0 items-center gap-2">

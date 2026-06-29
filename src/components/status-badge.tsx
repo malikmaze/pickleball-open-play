@@ -28,6 +28,7 @@ const sessionSkillConfig: Record<SessionSkillLevel, string> = {
 };
 
 const playerSkillConfig: Record<PlayerSkillLevel, string> = {
+  Newbie: "bg-sky-50 text-sky-700 border-sky-200",
   Beginner: "bg-blue-50 text-blue-700 border-blue-200",
   Novice: "bg-cyan-50 text-cyan-700 border-cyan-200",
   "Intermediate Low": "bg-amber-50 text-amber-700 border-amber-200",

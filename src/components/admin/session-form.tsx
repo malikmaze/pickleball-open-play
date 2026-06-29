@@ -561,8 +561,9 @@ export function SessionForm({
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              Strict keeps skill levels tight. Balanced is recommended. Flexible
-              fills courts faster.
+              Strict keeps main-pool skill levels tight. Balanced is recommended.
+              Flexible fills courts faster. When 4+ Newbies are waiting, they are
+              grouped on their own court automatically.
             </p>
           </div>
           {values.paymentRequired && (

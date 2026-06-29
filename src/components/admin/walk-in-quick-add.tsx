@@ -32,9 +32,6 @@ import type { Player, PlayerSkillLevel, ProfileGender, Session } from "@/types";
 const genderItems = Object.fromEntries(
   PROFILE_GENDERS.map((g) => [g, g])
 );
-const skillItems = Object.fromEntries(
-  PLAYER_SKILL_LEVELS.map((level) => [level, level])
-);
 
 export function WalkInQuickAdd({
   session,
@@ -47,7 +44,7 @@ export function WalkInQuickAdd({
 }) {
   const nameRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState("");
-  const [skillLevel, setSkillLevel] = useState<PlayerSkillLevel>("Novice");
+  const [skillLevel, setSkillLevel] = useState<PlayerSkillLevel>("Newbie");
   const [gender, setGender] = useState<ProfileGender>(DEFAULT_PROFILE_GENDER);
   const [paid, setPaid] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -157,7 +154,6 @@ export function WalkInQuickAdd({
             <Label>Skill</Label>
             <Select
               value={skillLevel}
-              items={skillItems}
               onValueChange={(v) => v && setSkillLevel(v as PlayerSkillLevel)}
             >
               <SelectTrigger className="w-full rounded-2xl border-2 border-black/10 bg-white">

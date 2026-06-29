@@ -5,6 +5,7 @@ export type SessionSkillLevel =
   | "Mixed";
 
 export type PlayerSkillLevel =
+  | "Newbie"
   | "Beginner"
   | "Novice"
   | "Intermediate Low"

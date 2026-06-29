@@ -6,12 +6,24 @@ import type {
 } from "@/types";
 
 export const PLAYER_SKILL_LEVELS: PlayerSkillLevel[] = [
+  "Newbie",
   "Beginner",
   "Novice",
   "Intermediate Low",
   "Intermediate High",
   "Advanced",
 ];
+
+/** Short copy for join/profile skill pickers. */
+export const PLAYER_SKILL_DESCRIPTIONS: Record<PlayerSkillLevel, string> = {
+  Newbie:
+    "First time — no racket sport experience, still learning to hit the ball.",
+  Beginner: "Some pickleball or racket sport experience, basic rallies.",
+  Novice: "Comfortable with rules and can sustain short rallies.",
+  "Intermediate Low": "Consistent play, working on strategy and placement.",
+  "Intermediate High": "Strong rallies, competitive open play.",
+  Advanced: "Tournament-level or very experienced competitive player.",
+};
 
 export const SESSION_SKILL_LEVELS: SessionSkillLevel[] = [
   "Beginner",
@@ -65,6 +77,7 @@ export const MAX_SESSION_PLAYERS = 100;
 export const FREE_SESSION_PAYMENT_NOTE = "Free to join — no payment required.";
 
 export const SKILL_NUMERIC: Record<PlayerSkillLevel, number> = {
+  Newbie: 0,
   Beginner: 1,
   Novice: 2,
   "Intermediate Low": 3,

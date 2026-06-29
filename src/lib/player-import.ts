@@ -28,6 +28,10 @@ function parseSkillToken(value: string): PlayerSkillLevel | undefined {
   if ((PLAYER_SKILL_LEVELS as readonly string[]).includes(normalized)) {
     return normalized as PlayerSkillLevel;
   }
+  const lower = normalized.toLowerCase();
+  if (lower === "newbie" || lower === "first timer" || lower === "first-timer") {
+    return "Newbie";
+  }
   return undefined;
 }
 
