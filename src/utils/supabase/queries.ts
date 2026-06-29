@@ -1045,17 +1045,35 @@ export async function createMatchRecord(
 
   const { data: players } = await supabase
     .from("players")
-    .select("name")
+    .select("id, name")
     .in("id", playerIds);
 
+  const byId = Object.fromEntries(
+    (players ?? []).map((p) => [p.id, p.name])
+  );
+  const teamA = [
+    byId[input.teamAPlayer1Id],
+    byId[input.teamAPlayer2Id],
+  ].filter(Boolean);
+  const teamB = [
+    byId[input.teamBPlayer1Id],
+    byId[input.teamBPlayer2Id],
+  ].filter(Boolean);
   const names = (players ?? []).map((p) => p.name);
+
   await logActivity(
     supabase,
     input.sessionId,
     "now_calling",
     `Court ${court?.court_number ?? "?"}`,
     names.join("\n"),
-    { courtId: input.courtId, playerIds }
+    {
+      courtId: input.courtId,
+      courtNumber: court?.court_number,
+      playerIds,
+      teamA,
+      teamB,
+    }
   );
 
   return mapMatch(data);
@@ -1170,6 +1188,14 @@ export async function finishMatchRecord(
     const losers = winnerTeam === "A" ? teamB : teamA;
     const score = `${teamAScore}–${teamBScore}`;
 
+    const winnerIds =
+      winnerTeam === "A"
+        ? [match.team_a_player_1, match.team_a_player_2]
+        : [match.team_b_player_1, match.team_b_player_2];
+    const winnerNames = winnerIds
+      .map((id) => (id ? nameMap.get(id) : null))
+      .filter((name): name is string => Boolean(name));
+
     await logActivity(
       supabase,
       court.session_id,
@@ -1178,10 +1204,12 @@ export async function finishMatchRecord(
       `${winners}\ndef.\n${losers}\n${score}`,
       {
         courtId,
+        courtNumber: court.court_number,
         matchId,
         winnerTeam,
         teamAScore,
         teamBScore,
+        winnerNames,
         winners,
         losers,
       }
