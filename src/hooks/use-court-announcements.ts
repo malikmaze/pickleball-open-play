@@ -3,20 +3,16 @@
 import { useEffect, useRef } from "react";
 import {
   announceCourtCall,
-  announceMatchWinner,
   courtCallInputFromActivity,
-  matchWinnerInputFromActivity,
 } from "@/lib/court-announcement";
 import type { ActivityLog } from "@/types";
 
-/** Announce court calls and match results from the live activity feed. */
+/** Announce court calls from the live activity feed. */
 export function useCourtAnnouncements(
   logs: ActivityLog[] | undefined,
   enabled: boolean,
   /** Skip one poll announce after a manual court call. */
-  skipCourtPollRef?: React.RefObject<boolean>,
-  /** Skip one poll announce after a manual winner congrats. */
-  skipWinnerPollRef?: React.RefObject<boolean>
+  skipCourtPollRef?: React.RefObject<boolean>
 ) {
   const seeded = useRef(false);
   const announced = useRef<Set<string>>(new Set());
@@ -42,24 +38,14 @@ export function useCourtAnnouncements(
     for (const log of newLogs) {
       announced.current.add(log.id);
 
-      if (log.eventType === "now_calling") {
-        if (skipCourtPollRef?.current) {
-          skipCourtPollRef.current = false;
-          continue;
-        }
-        const call = courtCallInputFromActivity(log);
-        if (call) announceCourtCall(call);
+      if (log.eventType !== "now_calling") continue;
+
+      if (skipCourtPollRef?.current) {
+        skipCourtPollRef.current = false;
         continue;
       }
-
-      if (log.eventType === "match_finished") {
-        if (skipWinnerPollRef?.current) {
-          skipWinnerPollRef.current = false;
-          continue;
-        }
-        const winner = matchWinnerInputFromActivity(log);
-        if (winner) announceMatchWinner(winner);
-      }
+      const call = courtCallInputFromActivity(log);
+      if (call) announceCourtCall(call);
     }
-  }, [logs, enabled, skipCourtPollRef, skipWinnerPollRef]);
+  }, [logs, enabled, skipCourtPollRef]);
 }
