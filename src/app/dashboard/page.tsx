@@ -4,9 +4,9 @@ import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
-import { AppHeader } from "@/components/app-header";
 import { EmptyState } from "@/components/empty-state";
-import { PageShell } from "@/components/page-shell";
+import { GuestAppHeader, GuestPage } from "@/components/guest/guest-page";
+import { GuestPageHeader } from "@/components/guest/guest-ui";
 import { SessionCard } from "@/components/session-card";
 import { useAuth } from "@/hooks/use-auth";
 import {
@@ -28,11 +28,11 @@ export default function DashboardPage() {
   return (
     <Suspense
       fallback={
-        <PageShell>
+        <GuestPage header={<GuestAppHeader subtitle="Schedule" logoHref="/" />}>
           <div className="flex items-center justify-center py-20">
             <Loader2 className="h-8 w-8 animate-spin text-sisclub-green" />
           </div>
-        </PageShell>
+        </GuestPage>
       }
     >
       <DashboardContent />
@@ -137,18 +137,11 @@ function DashboardContent() {
   });
 
   return (
-    <PageShell>
-      <AppHeader subtitle="Today & upcoming" />
-
-      <div className="py-4 sm:py-6">
-        <div className="mb-6">
-          <h2 className="font-heading text-xl font-bold text-sisclub-green-dark sm:text-2xl">
-            Open Play Schedule
-          </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Today and upcoming sessions · Today is {todayLabel}
-          </p>
-        </div>
+    <GuestPage header={<GuestAppHeader subtitle="Schedule" logoHref="/" />}>
+      <GuestPageHeader
+        title="Open Play Schedule"
+        description={`Today and upcoming sessions · Today is ${todayLabel}`}
+      />
 
         {isLoading || authLoading ? (
           <div className="flex items-center justify-center py-20">
@@ -253,7 +246,6 @@ function DashboardContent() {
             ))}
           </div>
         )}
-      </div>
-    </PageShell>
+    </GuestPage>
   );
 }

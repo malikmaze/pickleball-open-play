@@ -18,11 +18,11 @@ export interface NavItem {
   action?: "logout";
 }
 
-/** Guests (players): browse, join open play, watch live — no login. */
+/** Guests (players): home, schedule, live courts — no login. */
 const guestNav: NavItem[] = [
   { href: "/", label: "Home", icon: Home },
-  { href: "/dashboard", label: "Sessions", icon: CalendarDays },
-  { href: "/live", label: "Live", icon: Radio },
+  { href: "/dashboard", label: "Schedule", icon: CalendarDays },
+  { href: "/live", label: "Courts", icon: Radio },
 ];
 
 /** Admin home nav — session tools appear when managing a specific session. */
@@ -34,7 +34,7 @@ const adminListNav: NavItem[] = [
 /** Mobile bottom nav when admin is not inside a session. */
 const adminMobileNav: NavItem[] = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/live", label: "Live", icon: Radio },
+  { href: "/live", label: "Courts", icon: Radio },
 ];
 
 function getAdminSessionNav(sessionId: string): NavItem[] {
@@ -90,14 +90,17 @@ export function isNavActive(
     if (pathname.startsWith("/admin")) return pathname === "/admin";
     return pathname === "/";
   }
-  if (label === "Sessions") {
+  if (label === "Schedule") {
     return (
       pathname === "/dashboard" ||
       pathname.startsWith("/session/") ||
       pathname.startsWith("/join")
     );
   }
-  if (label === "Live") {
+  if (label === "Courts" && href.endsWith("/courts")) {
+    return pathname.endsWith("/courts");
+  }
+  if (label === "Courts") {
     return pathname === "/live" || pathname.includes("/live");
   }
   if (label === "Check-in") {
@@ -112,9 +115,6 @@ export function isNavActive(
   }
   if (label === "Settings") {
     return pathname.includes("/admin/sessions/") && activeTab === "settings";
-  }
-  if (label === "Courts" && href.endsWith("/courts")) {
-    return pathname.endsWith("/courts");
   }
   if (href === "/admin") return pathname === "/admin";
   return pathname.startsWith(href);
@@ -135,7 +135,7 @@ export function getPublicNavItems(
   }
   return [
     { href: getHomeHref("guest"), label: "Home", icon: Home },
-    { href: "/dashboard", label: "Sessions", icon: CalendarDays },
-    { href: "/live", label: "Live", icon: Radio },
+    { href: "/dashboard", label: "Schedule", icon: CalendarDays },
+    { href: "/live", label: "Courts", icon: Radio },
   ];
 }

@@ -18,6 +18,13 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { FreeSessionBadge } from "@/components/free-session-badge";
+import {
+  guestBtnOutline,
+  guestBtnPink,
+  guestBtnPrimary,
+  guestCardClass,
+  guestCardJoinedClass,
+} from "@/components/guest/guest-ui";
 import { SkillBadge, StatusBadge } from "@/components/status-badge";
 import { formatSessionCourtsLabel } from "@/lib/court-schedule";
 import { formatSessionDate, isSessionPast } from "@/lib/sessions";
@@ -100,8 +107,8 @@ export function SessionCard({
       {isFree && <FreeSessionBadge variant="sticker" />}
       <Card
         className={cn(
-          "overflow-hidden rounded-3xl border-2 border-black/10 bg-white shadow-md transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg",
-          isJoined && "ring-2 ring-sisclub-green/30"
+          "overflow-hidden transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg",
+          isJoined ? guestCardJoinedClass : guestCardClass
         )}
       >
         <CardHeader
@@ -173,13 +180,19 @@ export function SessionCard({
           <div className="flex w-full flex-col gap-2 sm:flex-row">
             <Link
               href={`/session/${session.id}`}
-              className="inline-flex flex-1 items-center justify-center rounded-full bg-sisclub-green px-4 py-2.5 text-sm font-bold text-white hover:bg-sisclub-green-dark"
+              className={cn(
+                guestBtnPrimary,
+                "inline-flex flex-1 items-center justify-center px-4 py-2.5 text-sm"
+              )}
             >
               My status
             </Link>
             <Link
               href={`/sessions/${session.id}/live`}
-              className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-full border-2 border-sisclub-pink/30 bg-sisclub-pink-soft px-4 py-2.5 text-sm font-bold text-sisclub-pink-dark hover:bg-sisclub-pink/20"
+              className={cn(
+                guestBtnPink,
+                "inline-flex flex-1 items-center justify-center gap-1.5 px-4 py-2.5 text-sm"
+              )}
             >
               <Radio className="h-4 w-4" />
               Watch live
@@ -191,7 +204,7 @@ export function SessionCard({
               <Button
                 onClick={handleJoin}
                 disabled={isLoading}
-                className="flex-1 rounded-full border-2 border-black/10 bg-sisclub-green font-semibold text-white shadow-sm transition-all hover:bg-sisclub-green-dark hover:shadow-md"
+                className={cn(guestBtnPrimary, "flex-1 shadow-sm")}
               >
                 Join
               </Button>
@@ -209,7 +222,7 @@ export function SessionCard({
             {!canJoin && !canJoinWaitlist && !isPast && session.status !== "closed" && (
               <Link
                 href={`/sessions/${session.id}/live`}
-                className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-full border-2 border-black/10 px-4 py-2.5 text-sm font-semibold text-sisclub-pink-dark hover:bg-sisclub-pink-soft/50"
+                className={cn(guestBtnOutline, "inline-flex flex-1 items-center justify-center gap-1.5 px-4 py-2.5 text-sm")}
               >
                 <Radio className="h-4 w-4" />
                 Watch live

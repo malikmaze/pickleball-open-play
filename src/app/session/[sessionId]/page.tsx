@@ -5,10 +5,15 @@ import Link from "next/link";
 import { Loader2, Radio, Search } from "lucide-react";
 import { toast } from "sonner";
 import { ContactNumberInput } from "@/components/contact-number-input";
-import { AppHeader } from "@/components/app-header";
+import { GuestAppHeader, GuestPage } from "@/components/guest/guest-page";
+import {
+  guestBtnOutline,
+  guestBtnPink,
+  guestBtnPrimary,
+  guestCardClass,
+  guestCardJoinedClass,
+} from "@/components/guest/guest-ui";
 import { PlayerStatusBadge } from "@/components/player-status-badge";
-import { SessionPaymentBanner } from "@/components/session-payment-banner";
-import { PageShell } from "@/components/page-shell";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -27,6 +32,8 @@ import { findPlayerCourt, getGuestStatusHint } from "@/lib/guest-status";
 import { canPlayerWithdrawRegistration } from "@/lib/player-permissions";
 import { getQueuePosition, toQueuePlayer } from "@/lib/queue/queue-engine";
 import { getWaitlistPosition } from "@/lib/waitlist";
+import { SessionPaymentBanner } from "@/components/session-payment-banner";
+import { cn } from "@/lib/utils";
 import { getPhilippineMobileError } from "@/lib/phone";
 import { createClient } from "@/utils/supabase/client";
 import {
@@ -193,7 +200,7 @@ function SessionStatusContent({ sessionId }: { sessionId: string }) {
 
   return (
     <div className="space-y-4">
-      <Card className="rounded-3xl border-2 border-black/10">
+      <Card className={guestCardClass}>
         <CardHeader>
           <CardTitle className="font-heading text-sisclub-green-dark">
             {session.title}
@@ -210,7 +217,7 @@ function SessionStatusContent({ sessionId }: { sessionId: string }) {
       </Card>
 
       {myPlayer ? (
-        <Card className="rounded-3xl border-2 border-sisclub-green/30 bg-gradient-to-b from-white to-sisclub-green/5">
+        <Card className={guestCardJoinedClass}>
           <CardHeader>
             <CardTitle>Your spot</CardTitle>
           </CardHeader>
@@ -248,7 +255,7 @@ function SessionStatusContent({ sessionId }: { sessionId: string }) {
                   variant="outline"
                   onClick={() => void handleLeave()}
                   disabled={leaving}
-                  className="flex-1 rounded-full border-2 border-black/10"
+                  className={cn(guestBtnOutline, "flex-1")}
                 >
                   {leaving ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -260,7 +267,10 @@ function SessionStatusContent({ sessionId }: { sessionId: string }) {
               )}
               <Link
                 href={`/sessions/${sessionId}/live`}
-                className="inline-flex flex-1 items-center justify-center rounded-full bg-sisclub-pink px-4 py-2 text-sm font-bold text-white hover:bg-sisclub-pink-dark"
+                className={cn(
+                  guestBtnPink,
+                  "inline-flex flex-1 items-center justify-center px-4 py-2 text-sm"
+                )}
               >
                 <Radio className="mr-2 h-4 w-4" />
                 Watch live
@@ -280,7 +290,10 @@ function SessionStatusContent({ sessionId }: { sessionId: string }) {
               {session.status !== "closed" && (
                 <Link
                   href={`/join?sessionId=${sessionId}`}
-                  className="inline-flex h-12 w-full items-center justify-center rounded-full bg-sisclub-green font-bold text-white hover:bg-sisclub-green-dark"
+                  className={cn(
+                    guestBtnPrimary,
+                    "inline-flex h-12 w-full items-center justify-center"
+                  )}
                 >
                   {session.status === "full" ? "Join waitlist" : "Join now"}
                 </Link>
@@ -289,7 +302,7 @@ function SessionStatusContent({ sessionId }: { sessionId: string }) {
           </Card>
 
           {session.status !== "closed" && (
-            <Card className="rounded-3xl border-2 border-black/10">
+            <Card className={guestCardClass}>
               <CardHeader className="pb-2">
                 <CardTitle className="flex items-center gap-2 text-base">
                   <Search className="h-4 w-4 text-sisclub-green" />
@@ -318,14 +331,14 @@ function SessionStatusContent({ sessionId }: { sessionId: string }) {
                         type="button"
                         variant="outline"
                         onClick={() => setShowRecovery(false)}
-                        className="flex-1 rounded-full"
+                        className={cn(guestBtnOutline, "flex-1")}
                       >
                         Cancel
                       </Button>
                       <Button
                         type="submit"
                         disabled={recovering}
-                        className="flex-1 rounded-full bg-sisclub-green text-white"
+                        className={cn(guestBtnPrimary, "flex-1")}
                       >
                         {recovering ? (
                           <Loader2 className="h-4 w-4 animate-spin" />
@@ -339,7 +352,7 @@ function SessionStatusContent({ sessionId }: { sessionId: string }) {
                   <Button
                     variant="outline"
                     onClick={() => setShowRecovery(true)}
-                    className="w-full rounded-full border-2 border-black/10"
+                    className={cn(guestBtnOutline, "w-full")}
                   >
                     Find my registration
                   </Button>
@@ -368,17 +381,22 @@ export default function PublicSessionPage({
   }, [params]);
 
   return (
-    <PageShell>
-      <AppHeader subtitle="Session status" backHref="/dashboard" />
-      <div className="py-4 sm:py-6">
-        {sessionId ? (
-          <Suspense>
-            <SessionStatusContent sessionId={sessionId} />
-          </Suspense>
-        ) : (
-          <Loader2 className="mx-auto h-8 w-8 animate-spin text-sisclub-green" />
-        )}
-      </div>
-    </PageShell>
+    <GuestPage
+      header={
+        <GuestAppHeader
+          subtitle="Your status"
+          backHref="/dashboard"
+          logoHref="/dashboard"
+        />
+      }
+    >
+      {sessionId ? (
+        <Suspense>
+          <SessionStatusContent sessionId={sessionId} />
+        </Suspense>
+      ) : (
+        <Loader2 className="mx-auto h-8 w-8 animate-spin text-sisclub-green" />
+      )}
+    </GuestPage>
   );
 }
