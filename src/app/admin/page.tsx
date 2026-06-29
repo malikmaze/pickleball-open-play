@@ -15,6 +15,17 @@ import {
   LogOut,
   Play,
 } from "lucide-react";
+import {
+  AdminActionGroup,
+  AdminEmptyState,
+  AdminFilterPills,
+  AdminLoading,
+  AdminPageHeader,
+  adminBtnOutline,
+  adminBtnPrimary,
+  adminCardClass,
+  adminShellHeaderClass,
+} from "@/components/admin/admin-ui";
 import { AppHeader } from "@/components/app-header";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { PageShell } from "@/components/page-shell";
@@ -58,6 +69,7 @@ import {
   type SessionListScope,
 } from "@/utils/supabase/queries";
 import type { Session } from "@/types";
+import { adminSessionBodyGap, adminSessionWidth } from "@/lib/layout";
 import { cn } from "@/lib/utils";
 
 const FILTER_OPTIONS: { id: SessionListScope; label: string }[] = [
@@ -222,79 +234,71 @@ export default function AdminPage() {
   };
 
   return (
-    <PageShell size="wide">
-      <AppHeader subtitle="Admin dashboard" />
+    <PageShell size="fluid" className="px-0 sm:px-0 lg:px-0">
+      <AppHeader
+        subtitle="Admin dashboard"
+        compact
+        logoHref="/admin"
+        className={adminShellHeaderClass}
+        contentClassName={adminSessionWidth}
+      />
 
-      <div className="py-4 sm:py-6">
-        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <h2 className="font-heading text-xl font-bold text-sisclub-green-dark sm:text-2xl">
-              Manage Sessions
-            </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Create and manage open play sessions.{" "}
+      <div className={cn(adminSessionWidth, adminSessionBodyGap, "w-full")}>
+        <AdminPageHeader
+          title="Manage sessions"
+          description={
+            <>
+              Create and run open play sessions.{" "}
               <Link
                 href="/dashboard"
                 className="font-medium text-sisclub-green underline-offset-2 hover:underline"
               >
                 View guest schedule
               </Link>
-            </p>
-          </div>
-          <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end">
-            <Button
-              variant="outline"
-              onClick={handleSamplePlay}
-              disabled={sampleLoading}
-              className="min-h-10 flex-1 rounded-full border-2 border-sisclub-pink/40 text-sisclub-pink-dark hover:bg-sisclub-pink-soft sm:flex-none"
-            >
-              {sampleLoading ? (
-                <Loader2 className="mr-1 h-4 w-4 animate-spin" />
-              ) : (
-                <Play className="mr-1 h-4 w-4" />
-              )}
-              Sample play
-            </Button>
-            <Button
-              onClick={openCreate}
-              className="min-h-10 flex-1 rounded-full border-2 border-black/10 bg-sisclub-green font-semibold text-white shadow-sm hover:bg-sisclub-green-dark sm:flex-none"
-            >
-              <Plus className="mr-1 h-4 w-4" />
-              New
-            </Button>
-            <Button
-              variant="outline"
-              onClick={handleLogout}
-              className="rounded-full border-2 border-black/10"
-              aria-label="Sign out"
-            >
-              <LogOut className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
+            </>
+          }
+          actions={
+            <>
+              <Button
+                variant="outline"
+                onClick={handleSamplePlay}
+                disabled={sampleLoading}
+                className={cn(
+                  adminBtnOutline,
+                  "min-h-10 flex-1 border-sisclub-pink/40 text-sisclub-pink-dark hover:bg-sisclub-pink-soft sm:flex-none"
+                )}
+              >
+                {sampleLoading ? (
+                  <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                ) : (
+                  <Play className="mr-1 h-4 w-4" />
+                )}
+                Sample play
+              </Button>
+              <Button onClick={openCreate} className={cn(adminBtnPrimary, "min-h-10 flex-1 sm:flex-none")}>
+                <Plus className="mr-1 h-4 w-4" />
+                New session
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleLogout}
+                className={adminBtnOutline}
+                aria-label="Sign out"
+              >
+                <LogOut className="h-4 w-4" />
+              </Button>
+            </>
+          }
+        />
 
-        <div className="mb-6 flex flex-wrap gap-2">
-          {FILTER_OPTIONS.map((opt) => (
-            <Button
-              key={opt.id}
-              type="button"
-              variant={listScope === opt.id ? "default" : "outline"}
-              onClick={() => setListScope(opt.id)}
-              className={cn(
-                "rounded-full border-2 border-black/10",
-                listScope === opt.id &&
-                  "bg-sisclub-green font-semibold text-white hover:bg-sisclub-green-dark"
-              )}
-            >
-              {opt.label}
-            </Button>
-          ))}
-        </div>
+        <AdminFilterPills
+          options={FILTER_OPTIONS}
+          value={listScope}
+          onChange={setListScope}
+        />
 
         {isLoading ? (
-          <div className="flex items-center justify-center py-20">
-            <Loader2 className="h-8 w-8 animate-spin text-sisclub-green" />
-          </div>
+          <AdminLoading label="Loading sessions…" />
         ) : error ? (
           <div className="rounded-3xl border-2 border-destructive/30 bg-destructive/5 px-6 py-12 text-center">
             <p className="text-sm text-destructive">{error}</p>
@@ -306,128 +310,138 @@ export default function AdminPage() {
             </button>
           </div>
         ) : sessions.length === 0 ? (
-          <Card className="rounded-3xl border-2 border-dashed border-black/10 bg-white/60">
-            <CardContent className="py-12 text-center">
-              <p className="text-muted-foreground">No sessions yet.</p>
-              <div className="mt-4 flex flex-col items-center gap-2 sm:flex-row sm:justify-center">
+          <AdminEmptyState
+            title="No sessions yet"
+            description="Create a session or load the sample play to explore courts, queue, and check-in."
+            actions={
+              <>
                 <Button
                   onClick={handleSamplePlay}
                   disabled={sampleLoading}
                   variant="outline"
-                  className="rounded-full border-2 border-sisclub-pink/40 text-sisclub-pink-dark hover:bg-sisclub-pink-soft"
+                  className={cn(
+                    adminBtnOutline,
+                    "border-sisclub-pink/40 text-sisclub-pink-dark hover:bg-sisclub-pink-soft"
+                  )}
                 >
                   {sampleLoading ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   ) : (
                     <Play className="mr-2 h-4 w-4" />
                   )}
-                  Load sample play
+                  Sample play
                 </Button>
-                <Button
-                  onClick={openCreate}
-                  className="rounded-full bg-sisclub-green font-semibold hover:bg-sisclub-green-dark"
-                >
+                <Button onClick={openCreate} className={adminBtnPrimary}>
                   Create first session
                 </Button>
-              </div>
-            </CardContent>
-          </Card>
+              </>
+            }
+          />
         ) : (
-          <div className="space-y-4">
-            {sessions.map((session) => (
-              <Card
-                key={session.id}
-                className="rounded-3xl border-2 border-black/10 shadow-md"
-              >
-                <CardHeader className="pb-2">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="min-w-0">
-                      <CardTitle className="font-heading text-lg text-sisclub-green-dark">
-                        {session.title}
-                      </CardTitle>
-                      <CardDescription className="mt-1 break-words">
-                        {formatSessionDate(session.date)} · {session.startTime}{" "}
-                        – {session.endTime} ·{" "}
-                        {formatSessionCourtsLabel(session.courtCount)}
-                      </CardDescription>
-                    </div>
-                    <div className="flex gap-1.5">
-                      <StatusBadge status={session.status} />
-                      <SkillBadge level={session.skillLevel} />
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <p className="text-sm text-muted-foreground">
-                    {countAdmittedPlayers(session.players)} /{" "}
-                    {session.maxPlayers} joined
-                    {getWaitlistedPlayers(session.players).length > 0 &&
-                      ` · ${getWaitlistedPlayers(session.players).length} waitlisted`}
-                  </p>
+          <div className="grid gap-4 xl:grid-cols-2">
+            {sessions.map((session) => {
+              const admitted = countAdmittedPlayers(session.players);
+              const waitlisted = getWaitlistedPlayers(session.players).length;
 
-                  <div className="flex flex-wrap gap-2">
-                    <Link
-                      href={`/admin/sessions/${session.id}/courts`}
-                      className="inline-flex h-7 items-center rounded-full bg-sisclub-pink px-3 text-xs font-medium text-white hover:bg-sisclub-pink-dark"
-                    >
-                      Live Court View
-                    </Link>
-                    <Link
-                      href={`/admin/sessions/${session.id}`}
-                      className="inline-flex h-7 items-center rounded-full bg-sisclub-green px-3 text-xs font-medium text-white hover:bg-sisclub-green-dark"
-                    >
-                      Manage
-                    </Link>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => openEdit(session)}
-                      className="rounded-full border-2 border-black/10"
-                    >
-                      <Pencil className="mr-1 h-3.5 w-3.5" />
-                      Edit
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleToggleClosed(session)}
-                      className="rounded-full border-2 border-black/10"
-                    >
-                      {session.status === "closed" ? (
-                        <>
-                          <Unlock className="mr-1 h-3.5 w-3.5" />
-                          Reopen
-                        </>
-                      ) : (
-                        <>
-                          <Lock className="mr-1 h-3.5 w-3.5" />
-                          Close
-                        </>
+              return (
+                <Card key={session.id} className={adminCardClass}>
+                  <CardHeader className="pb-2">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="min-w-0">
+                        <CardTitle className="font-heading text-lg text-sisclub-green-dark">
+                          {session.title}
+                        </CardTitle>
+                        <CardDescription className="mt-1 break-words">
+                          {formatSessionDate(session.date)} · {session.startTime}{" "}
+                          – {session.endTime} ·{" "}
+                          {formatSessionCourtsLabel(session.courtCount)}
+                        </CardDescription>
+                      </div>
+                      <div className="flex shrink-0 flex-wrap gap-1.5">
+                        <StatusBadge status={session.status} />
+                        <SkillBadge level={session.skillLevel} />
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="flex flex-wrap gap-2 text-sm">
+                      <span className="rounded-full bg-muted/60 px-2.5 py-1 font-medium">
+                        {admitted} / {session.maxPlayers} booked
+                      </span>
+                      {waitlisted > 0 && (
+                        <span className="rounded-full bg-orange-100 px-2.5 py-1 font-medium text-orange-900">
+                          {waitlisted} waitlisted
+                        </span>
                       )}
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setClearTarget(session.id)}
-                      disabled={session.players.length === 0}
-                      className="rounded-full border-2 border-black/10"
-                    >
-                      <Users className="mr-1 h-3.5 w-3.5" />
-                      Clear players
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      onClick={() => setDeleteTarget(session.id)}
-                      className="rounded-full"
-                    >
-                      <Trash2 className="mr-1 h-3.5 w-3.5" />
-                      Delete
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                    </div>
+
+                    <AdminActionGroup className="border-t-0 pt-0">
+                      <Link
+                        href={`/admin/sessions/${session.id}`}
+                        className={cn(
+                          "inline-flex h-8 items-center px-3.5 text-xs font-semibold text-white",
+                          adminBtnPrimary
+                        )}
+                      >
+                        Manage
+                      </Link>
+                      <Link
+                        href={`/admin/sessions/${session.id}/courts`}
+                        className="inline-flex h-8 items-center rounded-full bg-sisclub-pink px-3.5 text-xs font-semibold text-white hover:bg-sisclub-pink-dark"
+                      >
+                        Live courts
+                      </Link>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => openEdit(session)}
+                        className={adminBtnOutline}
+                      >
+                        <Pencil className="mr-1 h-3.5 w-3.5" />
+                        Edit
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleToggleClosed(session)}
+                        className={adminBtnOutline}
+                      >
+                        {session.status === "closed" ? (
+                          <>
+                            <Unlock className="mr-1 h-3.5 w-3.5" />
+                            Reopen
+                          </>
+                        ) : (
+                          <>
+                            <Lock className="mr-1 h-3.5 w-3.5" />
+                            Close
+                          </>
+                        )}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setClearTarget(session.id)}
+                        disabled={session.players.length === 0}
+                        className={adminBtnOutline}
+                      >
+                        <Users className="mr-1 h-3.5 w-3.5" />
+                        Clear
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => setDeleteTarget(session.id)}
+                        className="rounded-full"
+                      >
+                        <Trash2 className="mr-1 h-3.5 w-3.5" />
+                        Delete
+                      </Button>
+                    </AdminActionGroup>
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         )}
       </div>

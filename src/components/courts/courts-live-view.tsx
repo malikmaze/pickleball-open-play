@@ -43,9 +43,22 @@ import {
   updateMatchScoresRecord,
 } from "@/utils/supabase/queries";
 import type { Court, Match, SessionBundle } from "@/types";
+import { cn } from "@/lib/utils";
 
 function queueSettings(session: SessionBundle["session"]) {
   return getQueueSessionSettings(session);
+}
+
+function courtGridClasses(hasSidebar: boolean, courtCount: number) {
+  return cn(
+    "grid items-stretch gap-4 sm:gap-5",
+    hasSidebar
+      ? "grid-cols-1 lg:grid-cols-2"
+      : cn(
+          "grid-cols-1 md:grid-cols-2",
+          courtCount >= 3 && "xl:grid-cols-3"
+        )
+  );
 }
 
 export function CourtsLiveView({
@@ -125,11 +138,13 @@ export function CourtsLiveView({
 
   const nextAssignment = useMemo(() => {
     if (!session) return null;
-    return previewNextMatch(
-      session.players.map((p) => toQueuePlayer(p)),
-      queueSettings(session)
-    );
-  }, [session]);
+    return previewNextMatch(queuePlayers, queueSettings(session));
+  }, [session, queuePlayers]);
+
+  const nextUpPlayerIds = useMemo(
+    () => new Set(nextAssignment?.players.map((p) => p.id) ?? []),
+    [nextAssignment]
+  );
 
   const finishedByCourt = useMemo(() => {
     const map: Record<string, Match | null> = {};
@@ -389,6 +404,17 @@ export function CourtsLiveView({
     );
   }
 
+  const hasSidebar = showQueue || showSidePanels;
+  const activityLogs = bundle?.activityLogs ?? [];
+  const queuePanel = (
+    <QueuePanel
+      players={queuePlayers}
+      partnerPool={session.players}
+      highlightPlayerId={highlightPlayerId}
+      nextUpPlayerIds={nextUpPlayerIds}
+    />
+  );
+
   return (
     <div className="space-y-5">
       {!showSidePanels ? (
@@ -482,84 +508,104 @@ export function CourtsLiveView({
         </div>
       )}
 
-      <div className={showSidePanels ? "grid gap-6 lg:grid-cols-[1fr_minmax(260px,320px)]" : ""}>
-        <div className="space-y-5">
-      <div className="grid items-stretch gap-4 sm:gap-5 md:grid-cols-2">
-        {courts.map((court) => {
-          const match = courtMatches[court.id];
-          const finishedMatch =
-            court.status === "Finished" ? finishedByCourt[court.id] : null;
-          const score = scores[court.id] ?? {
-            a: match?.teamAScore?.toString() ?? "",
-            b: match?.teamBScore?.toString() ?? "",
-          };
+      <div
+        className={cn(
+          hasSidebar &&
+            "lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(300px,22rem)] lg:items-start lg:gap-5 xl:gap-6"
+        )}
+      >
+        <div className="min-w-0 space-y-5">
+          <div className={courtGridClasses(hasSidebar, courts.length)}>
+            {courts.map((court) => {
+              const match = courtMatches[court.id];
+              const finishedMatch =
+                court.status === "Finished" ? finishedByCourt[court.id] : null;
+              const score = scores[court.id] ?? {
+                a: match?.teamAScore?.toString() ?? "",
+                b: match?.teamBScore?.toString() ?? "",
+              };
 
-          return (
-            <CourtLiveCard
-              key={court.id}
-              court={court}
-              session={session}
-              match={match}
-              finishedMatch={finishedMatch}
-              isAdmin={isAdmin}
-              busy={busyCourt === court.id}
-              winnerFlash={winnerFlash[court.id] ?? null}
-              scoreInput={score}
-              nextMatch={
-                !match &&
-                court.status === "Empty" &&
-                isCourtRentalActive(court, session, now)
-                  ? nextAssignment
-                  : undefined
-              }
-              queueCount={queuePlayers.length}
-              highlightPlayerId={highlightPlayerId}
-              now={now}
-              onScoreChange={(a, b) =>
-                setScores((s) => ({ ...s, [court.id]: { a, b } }))
-              }
-              onAssign={() => handleAssign(court)}
-              onStart={() => match && handleStart(court, match)}
-              onUpdateScore={() => match && handleUpdateScore(court, match)}
-              onEndMatch={() => match && handleEndMatch(court, match)}
-              onChangeSides={() => handleChangeSides(court)}
-              onClear={() => handleClear(court)}
-            />
-          );
-        })}
-      </div>
+              return (
+                <CourtLiveCard
+                  key={court.id}
+                  court={court}
+                  session={session}
+                  match={match}
+                  finishedMatch={finishedMatch}
+                  isAdmin={isAdmin}
+                  busy={busyCourt === court.id}
+                  winnerFlash={winnerFlash[court.id] ?? null}
+                  scoreInput={score}
+                  nextMatch={
+                    !match &&
+                    court.status === "Empty" &&
+                    isCourtRentalActive(court, session, now)
+                      ? nextAssignment
+                      : undefined
+                  }
+                  queueCount={queuePlayers.length}
+                  highlightPlayerId={highlightPlayerId}
+                  now={now}
+                  onScoreChange={(a, b) =>
+                    setScores((s) => ({ ...s, [court.id]: { a, b } }))
+                  }
+                  onAssign={() => handleAssign(court)}
+                  onStart={() => match && handleStart(court, match)}
+                  onUpdateScore={() => match && handleUpdateScore(court, match)}
+                  onEndMatch={() => match && handleEndMatch(court, match)}
+                  onChangeSides={() => handleChangeSides(court)}
+                  onClear={() => handleClear(court)}
+                />
+              );
+            })}
+          </div>
 
-      {showQueue && !showSidePanels && (
-        <div className="grid gap-4 md:grid-cols-2">
-          <QueuePanel
-            players={queuePlayers}
-            partnerPool={session.players}
-            highlightPlayerId={highlightPlayerId}
-          />
-
-          {bundle?.activityLogs && bundle.activityLogs.length > 0 && (
-            <ActivityFeed logs={bundle.activityLogs} />
+          {hasSidebar && (
+            <div className="space-y-4 lg:hidden">
+              {queuePanel}
+              {showSidePanels && bundle && (
+                <>
+                  <WinnerHistory
+                    session={session}
+                    courts={bundle.courts}
+                    matches={bundle.matches}
+                  />
+                  {activityLogs.length > 0 && (
+                    <ActivityFeed logs={activityLogs} />
+                  )}
+                </>
+              )}
+              {!showSidePanels && activityLogs.length > 0 && (
+                <ActivityFeed logs={activityLogs} />
+              )}
+            </div>
           )}
         </div>
-      )}
-        </div>
 
-        {showSidePanels && bundle && session && (
-          <div className="space-y-4">
-            <QueuePanel
-            players={queuePlayers}
-            partnerPool={session.players}
-            highlightPlayerId={highlightPlayerId}
-          />
-            <WinnerHistory
-              session={session}
-              courts={bundle.courts}
-              matches={bundle.matches}
-            />
-            <ActivityFeed logs={bundle.activityLogs ?? []} />
-          </div>
+        {hasSidebar && (
+          <aside className="hidden space-y-4 lg:sticky lg:top-20 lg:block lg:max-h-[calc(100dvh-5.5rem)] lg:overflow-y-auto lg:pb-4">
+            {queuePanel}
+            {showSidePanels && bundle && (
+              <>
+                <WinnerHistory
+                  session={session}
+                  courts={bundle.courts}
+                  matches={bundle.matches}
+                />
+                {activityLogs.length > 0 && (
+                  <ActivityFeed logs={activityLogs} />
+                )}
+              </>
+            )}
+          </aside>
         )}
       </div>
+
+      {hasSidebar && !showSidePanels && activityLogs.length > 0 && (
+        <div className="hidden lg:block">
+          <ActivityFeed logs={activityLogs} />
+        </div>
+      )}
     </div>
   );
 }

@@ -204,20 +204,23 @@ export function CourtLiveCard({
             </p>
           </div>
         ) : displayMatch ? (
-          <div className="space-y-3 rounded-2xl border border-pink-100/80 bg-gradient-to-br from-pink-50/50 to-violet-50/30 p-3">
-            <CourtScoreboard
-              teamAScore={scoreA}
-              teamBScore={scoreB}
-              targetScore={session.targetScore}
-              winBy={session.winBy}
-              status={match?.status ?? "finished"}
-            />
-            <PickleballCourtView
-              teamA={teamA}
-              teamB={teamB}
-              sidesSwapped={court.sidesSwapped}
-              isPlaying={match?.status === "playing"}
-            />
+          <div className="@container space-y-3 rounded-2xl border border-pink-100/80 bg-gradient-to-br from-pink-50/50 to-violet-50/30 p-3 sm:p-4">
+            <div className="flex flex-col gap-3 @[44rem]:grid @[44rem]:grid-cols-[minmax(11rem,14rem)_minmax(0,1fr)] @[44rem]:items-start @[44rem]:gap-3">
+              <CourtScoreboard
+                teamAScore={scoreA}
+                teamBScore={scoreB}
+                targetScore={session.targetScore}
+                winBy={session.winBy}
+                status={match?.status ?? "finished"}
+                compact
+              />
+              <PickleballCourtView
+                teamA={teamA}
+                teamB={teamB}
+                sidesSwapped={court.sidesSwapped}
+                isPlaying={match?.status === "playing"}
+              />
+            </div>
             {showSideChangeHint && (
               <p className="rounded-xl bg-gradient-to-r from-amber-50 to-pink-50 px-3 py-2 text-center text-xs text-pink-700">
                 ✨ Side change suggested at {session.sideChangePoint} points

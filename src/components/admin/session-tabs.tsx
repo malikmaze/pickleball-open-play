@@ -2,6 +2,10 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
+import {
+  adminShellTabClass,
+  adminShellTabTrayClass,
+} from "@/components/admin/admin-ui";
 import { cn } from "@/lib/utils";
 
 const tabs = [
@@ -38,15 +42,15 @@ export function SessionAdminTabs({
       aria-label="Session sections"
       className={cn(
         embedded
-          ? "border-t border-black/10 pb-3 pt-3"
+          ? "border-t border-pink-200/40 py-2.5 sm:py-3"
           : cn(
-              "sticky z-30 mb-6 border-b border-black/10 bg-white/95 py-3 backdrop-blur-md supports-[backdrop-filter]:bg-white/85",
+              "sticky z-30 mb-6 border-b border-pink-200/40 bg-white/95 py-3 backdrop-blur-md supports-[backdrop-filter]:bg-white/85",
               "top-[calc(3.5rem+env(safe-area-inset-top,0px))]"
             ),
         className
       )}
     >
-      <div className="flex gap-2 overflow-x-auto scrollbar-none snap-x snap-mandatory sm:flex-wrap sm:overflow-visible sm:snap-none">
+      <div className={adminShellTabTrayClass}>
         {tabs.map((tab) => {
           const href =
             "href" in tab && tab.href
@@ -61,12 +65,7 @@ export function SessionAdminTabs({
             <Link
               key={tab.id}
               href={href}
-              className={cn(
-                "inline-flex h-9 shrink-0 snap-start items-center rounded-full px-3.5 text-sm font-medium transition-all sm:px-4",
-                isActive
-                  ? "bg-sisclub-green text-white shadow-sm"
-                  : "bg-muted/60 text-muted-foreground hover:bg-sisclub-pink-soft hover:text-sisclub-green-dark"
-              )}
+              className={adminShellTabClass(isActive)}
             >
               {tab.label}
             </Link>

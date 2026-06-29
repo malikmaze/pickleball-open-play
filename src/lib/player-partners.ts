@@ -73,9 +73,54 @@ export function partnerOptionsFor(
   playerId: string,
   players: Pick<Player, "id" | "name" | "status">[]
 ): Pick<Player, "id" | "name">[] {
+  return partnerSelectOptionsFor(playerId, players).filter((o) => !o.disabled);
+}
+
+export type PartnerSelectOption = {
+  id: string;
+  name: string;
+  disabled: boolean;
+  note?: string;
+};
+
+/** Partner dropdown rows — mutual pairs with someone else are disabled with a note. */
+export function partnerSelectOptionsFor(
+  playerId: string,
+  players: Pick<Player, "id" | "name" | "partnerId" | "status">[]
+): PartnerSelectOption[] {
   return players
     .filter((p) => p.id !== playerId && p.status !== "Waitlisted")
-    .sort((a, b) => a.name.localeCompare(b.name));
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map((candidate) => {
+      const mutual = getMutualPartner(candidate, players);
+
+      if (mutual && mutual.id !== playerId) {
+        return {
+          id: candidate.id,
+          name: candidate.name,
+          disabled: true,
+          note: `Paired with ${mutual.name}`,
+        };
+      }
+
+      if (candidate.partnerId && candidate.partnerId !== playerId) {
+        const linked = players.find((p) => p.id === candidate.partnerId);
+        if (linked) {
+          return {
+            id: candidate.id,
+            name: candidate.name,
+            disabled: true,
+            note: `Linked to ${linked.name}`,
+          };
+        }
+      }
+
+      return {
+        id: candidate.id,
+        name: candidate.name,
+        disabled: false,
+      };
+    });
 }
 
 /**
