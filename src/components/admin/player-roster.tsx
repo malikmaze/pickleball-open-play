@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { Search } from "lucide-react";
 import { PlayerPaymentBadge } from "@/components/player-payment-badge";
 import { PlayerStatusBadge } from "@/components/player-status-badge";
+import { BulkSelectBar } from "@/components/admin/bulk-select-bar";
 import {
   AdminSection,
   adminBtnOutline,
@@ -20,6 +21,10 @@ import {
 } from "@/components/ui/select";
 import { PLAYER_SKILL_LEVELS, PROFILE_GENDERS } from "@/lib/constants";
 import { isPlayerPaid } from "@/lib/player-payment";
+import {
+  playerCanBulkSelect,
+  type PlayerRemoveContext,
+} from "@/lib/player-remove";
 import type { Player, PlayerSkillLevel, ProfileGender } from "@/types";
 
 type RosterMode = "booked" | "checkin";
@@ -35,6 +40,8 @@ interface PlayerRosterProps {
   onStatus: (id: string, action: "present" | "noshow") => void;
   onPayment: (id: string, paid: boolean) => void;
   onRemove: (id: string) => void;
+  onBulkRemove?: (ids: string[]) => void;
+  removeContext: PlayerRemoveContext;
   onSkillChange: (id: string, skill: PlayerSkillLevel) => void;
   onGenderChange?: (id: string, gender: ProfileGender) => void;
   onBulkPresent?: (ids: string[]) => void;
@@ -68,6 +75,8 @@ export function PlayerRoster({
   onStatus,
   onPayment,
   onRemove,
+  onBulkRemove,
+  removeContext,
   onSkillChange,
   onGenderChange,
   onBulkPresent,
@@ -77,6 +86,7 @@ export function PlayerRoster({
   const [statusFilter, setStatusFilter] = useState<StatusFilter>(
     mode === "checkin" ? "pending" : "all"
   );
+  const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -97,6 +107,32 @@ export function PlayerRoster({
         .map((p) => p.id),
     [filtered]
   );
+
+  const selectableIds = useMemo(
+    () =>
+      filtered
+        .filter((p) => playerCanBulkSelect(p, removeContext))
+        .map((p) => p.id),
+    [filtered, removeContext]
+  );
+
+  const selectedInView = useMemo(
+    () => new Set([...selected].filter((id) => selectableIds.includes(id))),
+    [selected, selectableIds]
+  );
+
+  const toggleSelected = (id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleSelectAll = (checked: boolean) => {
+    setSelected(checked ? new Set(selectableIds) : new Set());
+  };
 
   const emptyCopy =
     mode === "booked"
@@ -120,7 +156,10 @@ export function PlayerRoster({
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setSelected(new Set());
+            }}
             placeholder="Search name or contact…"
             className="rounded-full border-2 border-black/10 pl-9"
           />
@@ -133,7 +172,10 @@ export function PlayerRoster({
             present: "In queue",
             playing: "On court",
           }}
-          onValueChange={(v) => setStatusFilter(v as StatusFilter)}
+          onValueChange={(v) => {
+            setStatusFilter(v as StatusFilter);
+            setSelected(new Set());
+          }}
         >
           <SelectTrigger className="w-full rounded-full border-2 border-black/10 lg:w-44">
             <SelectValue />
@@ -159,11 +201,29 @@ export function PlayerRoster({
         )}
       </div>
 
+      {onBulkRemove && filtered.length > 0 && (
+        <BulkSelectBar
+          selectedCount={selectedInView.size}
+          totalSelectable={selectableIds.length}
+          onSelectAll={handleSelectAll}
+          onClear={() => setSelected(new Set())}
+          onRemove={() => onBulkRemove([...selectedInView])}
+          removeLoading={bulkLoading}
+        />
+      )}
+
       {filtered.length === 0 ? (
         <p className="text-sm text-muted-foreground">{emptyCopy}</p>
       ) : (
         <div className="overflow-hidden rounded-2xl border border-black/5">
-          <div className="hidden grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto] gap-3 border-b border-black/5 bg-muted/30 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground md:grid">
+          <div
+            className={
+              onBulkRemove
+                ? "hidden grid-cols-[auto_minmax(0,1.4fr)_minmax(0,1fr)_auto] gap-3 border-b border-black/5 bg-muted/30 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground md:grid"
+                : "hidden grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto] gap-3 border-b border-black/5 bg-muted/30 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground md:grid"
+            }
+          >
+            {onBulkRemove && <span />}
             <span>Player</span>
             <span>Details</span>
             <span className="text-right">Actions</span>
@@ -177,12 +237,34 @@ export function PlayerRoster({
               const paid = isPlayerPaid(player);
               const canCheckIn =
                 player.status === "Registered" || player.status === "Secured";
+              const canSelect =
+                onBulkRemove && playerCanBulkSelect(player, removeContext);
 
               return (
                 <div
                   key={player.id}
-                  className="grid gap-3 px-4 py-3 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto] md:items-center"
+                  className={
+                    onBulkRemove
+                      ? "grid gap-3 px-4 py-3 md:grid-cols-[auto_minmax(0,1.4fr)_minmax(0,1fr)_auto] md:items-center"
+                      : "grid gap-3 px-4 py-3 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto] md:items-center"
+                  }
                 >
+                  {onBulkRemove && (
+                    <div className="flex items-start pt-0.5 md:items-center md:pt-0">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 accent-sisclub-green disabled:opacity-40"
+                        checked={selectedInView.has(player.id)}
+                        disabled={!canSelect}
+                        title={
+                          !canSelect
+                            ? "Cannot remove while on court"
+                            : undefined
+                        }
+                        onChange={() => toggleSelected(player.id)}
+                      />
+                    </div>
+                  )}
                   <div className="min-w-0">
                     <p className="font-semibold text-sisclub-green-dark">
                       {player.name}
@@ -308,6 +390,12 @@ export function PlayerRoster({
                       size="sm"
                       variant="destructive"
                       className="rounded-full"
+                      disabled={player.status === "Playing"}
+                      title={
+                        player.status === "Playing"
+                          ? "Clear the court before removing this player"
+                          : undefined
+                      }
                       onClick={() => onRemove(player.id)}
                     >
                       Remove

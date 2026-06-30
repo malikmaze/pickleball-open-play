@@ -1,7 +1,6 @@
 "use client";
 
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { Loader2, Plus, Upload } from "lucide-react";
@@ -18,6 +17,7 @@ import { AdminQueueTab } from "@/components/admin/admin-queue-tab";
 import { AddPlayerDialog } from "@/components/admin/add-player-dialog";
 import { ImportPlayersDialog } from "@/components/admin/import-players-dialog";
 import { WalkInQuickAdd } from "@/components/admin/walk-in-quick-add";
+import { BulkSelectBar } from "@/components/admin/bulk-select-bar";
 import { PlayerRoster } from "@/components/admin/player-roster";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import {
@@ -31,7 +31,6 @@ import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -41,6 +40,12 @@ import {
 } from "@/lib/queue/queue-engine";
 import { formatCourtRentalWindow } from "@/lib/court-schedule";
 import { FREE_SESSION_PAYMENT_NOTE } from "@/lib/constants";
+import {
+  bulkRemoveDialogCopy,
+  type PlayerRemoveContext,
+  resolvePlayerRemove,
+  summarizeBulkRemove,
+} from "@/lib/player-remove";
 import { cn } from "@/lib/utils";
 import {
   countAdmittedPlayers,
@@ -60,10 +65,27 @@ import {
   markPlayersPresentBulk,
   processWaitlistPromotions,
   setPlayerPartnerRecord,
+  uncheckPlayerFromQueueRecord,
   updatePlayerRecord,
   updateSessionRecord,
 } from "@/utils/supabase/queries";
 import type { Player, PlayerSkillLevel, ProfileGender, SessionBundle } from "@/types";
+
+function patchPlayerInBundle(
+  bundle: SessionBundle,
+  playerId: string,
+  patch: Partial<Player>
+): SessionBundle {
+  return {
+    ...bundle,
+    session: {
+      ...bundle.session,
+      players: bundle.session.players.map((player) =>
+        player.id === playerId ? { ...player, ...patch } : player
+      ),
+    },
+  };
+}
 
 function SessionAdminContent({ sessionId }: { sessionId: string }) {
   const searchParams = useSearchParams();
@@ -75,7 +97,11 @@ function SessionAdminContent({ sessionId }: { sessionId: string }) {
   const [addingTestPlayers, setAddingTestPlayers] = useState(false);
   const [addPlayerOpen, setAddPlayerOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
-  const [removeTarget, setRemoveTarget] = useState<string | null>(null);
+  const [removeRequest, setRemoveRequest] = useState<
+    | { kind: "single"; playerId: string; context: PlayerRemoveContext }
+    | { kind: "bulk"; playerIds: string[]; context: PlayerRemoveContext }
+    | null
+  >(null);
   const [removeLoading, setRemoveLoading] = useState(false);
   const [bulkLoading, setBulkLoading] = useState(false);
   const [partnerSaving, setPartnerSaving] = useState(false);
@@ -108,6 +134,50 @@ function SessionAdminContent({ sessionId }: { sessionId: string }) {
 
   const session = bundle?.session;
 
+  const removePlan = useMemo(() => {
+    if (!removeRequest || !session) return null;
+    if (removeRequest.kind === "single") {
+      const player = session.players.find((p) => p.id === removeRequest.playerId);
+      if (!player) return null;
+      const plan = resolvePlayerRemove(player, removeRequest.context);
+      return "blockedReason" in plan ? null : plan;
+    }
+    const players = removeRequest.playerIds
+      .map((id) => session.players.find((p) => p.id === id))
+      .filter((p): p is Player => !!p);
+    const summary = summarizeBulkRemove(players, removeRequest.context);
+    if (summary.entries.length === 0) return null;
+    return bulkRemoveDialogCopy(summary, removeRequest.context);
+  }, [removeRequest, session]);
+
+  const openRemove = (playerId: string, context: PlayerRemoveContext) => {
+    const player = session?.players.find((p) => p.id === playerId);
+    if (!player) return;
+    const plan = resolvePlayerRemove(player, context);
+    if ("blockedReason" in plan) {
+      toast.error(plan.blockedReason);
+      return;
+    }
+    setRemoveRequest({ kind: "single", playerId, context });
+  };
+
+  const openBulkRemove = (playerIds: string[], context: PlayerRemoveContext) => {
+    if (playerIds.length === 0 || !session) return;
+    const players = playerIds
+      .map((id) => session.players.find((p) => p.id === id))
+      .filter((p): p is Player => !!p);
+    const summary = summarizeBulkRemove(players, context);
+    if (summary.entries.length === 0) {
+      toast.error(summary.blocked[0]?.reason ?? "No players can be removed");
+      return;
+    }
+    setRemoveRequest({
+      kind: "bulk",
+      playerIds: summary.entries.map((e) => e.playerId),
+      context,
+    });
+  };
+
   const handlePlayerStatus = async (
     playerId: string,
     action: "present" | "noshow"
@@ -117,7 +187,7 @@ function SessionAdminContent({ sessionId }: { sessionId: string }) {
       if (action === "present") await markPlayerPresent(supabase, playerId, sessionId);
       if (action === "noshow") await markPlayerNoShow(supabase, playerId, sessionId);
       toast.success(action === "present" ? "Checked in" : "Marked no show");
-      await load();
+      await load(true);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Update failed");
     }
@@ -133,7 +203,7 @@ function SessionAdminContent({ sessionId }: { sessionId: string }) {
         await markPlayerUnpaid(supabase, playerId);
         toast.success("Marked unpaid");
       }
-      await load();
+      await load(true);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Payment update failed");
     }
@@ -143,30 +213,98 @@ function SessionAdminContent({ sessionId }: { sessionId: string }) {
     playerId: string,
     gender: ProfileGender
   ) => {
+    const previous = bundle?.session.players.find((p) => p.id === playerId)?.gender;
+    setBundle((prev) =>
+      prev ? patchPlayerInBundle(prev, playerId, { gender }) : prev
+    );
+
     const supabase = createClient();
     try {
       await updatePlayerRecord(supabase, playerId, { gender });
       await load(true);
     } catch (err) {
+      if (previous !== undefined) {
+        setBundle((prev) =>
+          prev ? patchPlayerInBundle(prev, playerId, { gender: previous }) : prev
+        );
+      } else {
+        await load(true);
+      }
       toast.error(err instanceof Error ? err.message : "Update failed");
     }
   };
 
-  const handleRemovePlayer = async (playerId: string) => {
+  const handleConfirmRemove = async () => {
+    if (!removeRequest || !session) return;
+
     setRemoveLoading(true);
     const supabase = createClient();
     try {
-      await deletePlayerRecord(supabase, playerId);
-      const promoted = await processWaitlistPromotions(supabase, sessionId);
-      if (promoted > 0) {
-        toast.success(
-          `Player removed · ${promoted} waitlisted player${promoted === 1 ? "" : "s"} admitted`
-        );
+      if (removeRequest.kind === "single") {
+        const player = session.players.find((p) => p.id === removeRequest.playerId);
+        if (!player) return;
+        const plan = resolvePlayerRemove(player, removeRequest.context);
+        if ("blockedReason" in plan) return;
+
+        if (plan.action === "uncheck") {
+          await uncheckPlayerFromQueueRecord(supabase, removeRequest.playerId);
+          toast.success(
+            removeRequest.context === "queue"
+              ? `${player.name} moved back to check-in`
+              : `${player.name} moved back to booked list`
+          );
+        } else {
+          await deletePlayerRecord(supabase, removeRequest.playerId);
+          const promoted = await processWaitlistPromotions(supabase, sessionId);
+          if (promoted > 0) {
+            toast.success(
+              `${player.name} removed · ${promoted} waitlisted player${promoted === 1 ? "" : "s"} admitted`
+            );
+          } else {
+            toast.success(`${player.name} removed from session`);
+          }
+        }
       } else {
-        toast.success("Player removed");
+        const players = removeRequest.playerIds
+          .map((id) => session.players.find((p) => p.id === id))
+          .filter((p): p is Player => !!p);
+        const summary = summarizeBulkRemove(players, removeRequest.context);
+
+        for (const entry of summary.entries) {
+          if (entry.action === "uncheck") {
+            await uncheckPlayerFromQueueRecord(supabase, entry.playerId);
+          } else {
+            await deletePlayerRecord(supabase, entry.playerId);
+          }
+        }
+
+        let promoted = 0;
+        if (summary.deleteCount > 0) {
+          promoted = await processWaitlistPromotions(supabase, sessionId);
+        }
+
+        const n = summary.entries.length;
+        const parts: string[] = [`${n} player${n === 1 ? "" : "s"} updated`];
+        if (summary.uncheckCount > 0) {
+          parts.push(
+            `${summary.uncheckCount} moved to ${
+              removeRequest.context === "queue" ? "check-in" : "booked list"
+            }`
+          );
+        }
+        if (summary.deleteCount > 0) {
+          parts.push(`${summary.deleteCount} removed`);
+        }
+        if (promoted > 0) {
+          parts.push(
+            `${promoted} waitlisted admitted`
+          );
+        }
+        toast.success(parts.join(" · "));
       }
-      setRemoveTarget(null);
-      await load();
+
+      setRemoveRequest(null);
+      await load(true);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Remove failed");
     } finally {
@@ -180,7 +318,7 @@ function SessionAdminContent({ sessionId }: { sessionId: string }) {
     try {
       const count = await markPlayersPresentBulk(supabase, sessionId, playerIds);
       toast.success(`Checked in ${count} player${count === 1 ? "" : "s"}`);
-      await load();
+      await load(true);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Bulk check-in failed");
     } finally {
@@ -203,12 +341,27 @@ function SessionAdminContent({ sessionId }: { sessionId: string }) {
     playerId: string,
     skillLevel: PlayerSkillLevel
   ) => {
+    const previous = bundle?.session.players.find((p) => p.id === playerId)
+      ?.skillLevel;
+    setBundle((prev) =>
+      prev ? patchPlayerInBundle(prev, playerId, { skillLevel }) : prev
+    );
+
     const supabase = createClient();
     try {
       await updatePlayerRecord(supabase, playerId, { skillLevel });
       toast.success(`Skill updated to ${skillLevel}`);
-      await load();
+      await load(true);
     } catch (err) {
+      if (previous) {
+        setBundle((prev) =>
+          prev
+            ? patchPlayerInBundle(prev, playerId, { skillLevel: previous })
+            : prev
+        );
+      } else {
+        await load(true);
+      }
       const message = err instanceof Error ? err.message : "Update failed";
       toast.error(
         message.includes("skill_level") || message.includes("check constraint")
@@ -227,7 +380,7 @@ function SessionAdminContent({ sessionId }: { sessionId: string }) {
     try {
       await setPlayerPartnerRecord(supabase, sessionId, playerId, partnerId);
       toast.success(partnerId ? "Partner updated" : "Partner removed");
-      await load();
+      await load(true);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Partner update failed");
     } finally {
@@ -287,7 +440,7 @@ function SessionAdminContent({ sessionId }: { sessionId: string }) {
     [queuePlayers]
   );
 
-  if (loading || !session) {
+  if ((loading && !bundle) || !session) {
     return (
       <div className="flex justify-center py-20">
         <Loader2 className="h-8 w-8 animate-spin text-sisclub-green" />
@@ -435,15 +588,22 @@ function SessionAdminContent({ sessionId }: { sessionId: string }) {
           )}
 
           <PlayerRoster
+            key={tab}
             players={session.players.filter((p) => isAdmittedPlayer(p.status))}
             mode={tab === "checkin" ? "checkin" : "booked"}
+            removeContext={tab === "checkin" ? "checkin" : "booked"}
             onStatus={handlePlayerStatus}
             onPayment={handlePayment}
-            onRemove={(id) => setRemoveTarget(id)}
+            onRemove={(id) =>
+              openRemove(id, tab === "checkin" ? "checkin" : "booked")
+            }
+            onBulkRemove={(ids) =>
+              openBulkRemove(ids, tab === "checkin" ? "checkin" : "booked")
+            }
             onSkillChange={handleSkillChange}
             onGenderChange={handleGenderChange}
             onBulkPresent={tab === "checkin" ? handleBulkPresent : undefined}
-            bulkLoading={bulkLoading}
+            bulkLoading={bulkLoading || removeLoading}
           />
           {tab === "registrations" && (
             <WaitlistPanel
@@ -451,7 +611,9 @@ function SessionAdminContent({ sessionId }: { sessionId: string }) {
               admittedCount={countAdmittedPlayers(session.players)}
               maxPlayers={session.maxPlayers}
               onAdmit={handleAdmitWaitlisted}
-              onRemove={(id) => setRemoveTarget(id)}
+              onRemove={(id) => openRemove(id, "waitlist")}
+              onBulkRemove={(ids) => openBulkRemove(ids, "waitlist")}
+              bulkRemoveLoading={removeLoading}
             />
           )}
         </div>
@@ -465,7 +627,9 @@ function SessionAdminContent({ sessionId }: { sessionId: string }) {
           partnerPlayers={session.players.filter((p) => isAdmittedPlayer(p.status))}
           onPartnerChange={handlePartnerChange}
           partnerSaving={partnerSaving}
-          onRemovePlayer={(id) => setRemoveTarget(id)}
+          onRemovePlayer={(id) => openRemove(id, "queue")}
+          onBulkRemovePlayers={(ids) => openBulkRemove(ids, "queue")}
+          bulkRemoveLoading={removeLoading}
         />
       )}
 
@@ -514,13 +678,13 @@ function SessionAdminContent({ sessionId }: { sessionId: string }) {
       />
 
       <ConfirmDialog
-        open={!!removeTarget}
-        onOpenChange={(open) => !open && setRemoveTarget(null)}
-        title="Remove player?"
-        description="This removes them from the session. Waitlisted players may be auto-admitted if a spot opens."
-        confirmLabel="Remove"
-        variant="destructive"
-        onConfirm={() => removeTarget && handleRemovePlayer(removeTarget)}
+        open={!!removeRequest && !!removePlan}
+        onOpenChange={(open) => !open && setRemoveRequest(null)}
+        title={removePlan?.title ?? "Remove player?"}
+        description={removePlan?.description ?? ""}
+        confirmLabel={removePlan?.confirmLabel ?? "Remove"}
+        variant={removePlan?.destructive ? "destructive" : "default"}
+        onConfirm={handleConfirmRemove}
         isLoading={removeLoading}
       />
     </>
@@ -533,14 +697,33 @@ function WaitlistPanel({
   maxPlayers,
   onAdmit,
   onRemove,
+  onBulkRemove,
+  bulkRemoveLoading,
 }: {
   players: Player[];
   admittedCount: number;
   maxPlayers: number;
   onAdmit: (playerId: string) => void;
   onRemove: (playerId: string) => void;
+  onBulkRemove?: (playerIds: string[]) => void;
+  bulkRemoveLoading?: boolean;
 }) {
   const hasCapacity = admittedCount < maxPlayers;
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const selectableIds = players.map((p) => p.id);
+
+  const toggleSelected = (id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleSelectAll = (checked: boolean) => {
+    setSelected(checked ? new Set(selectableIds) : new Set());
+  };
 
   return (
     <AdminSection
@@ -551,13 +734,33 @@ function WaitlistPanel({
       {players.length === 0 ? (
         <p className="text-sm text-muted-foreground">No one on the waitlist.</p>
       ) : (
-        <div className="divide-y divide-black/5 rounded-2xl border border-black/5">
+        <>
+          {onBulkRemove && (
+            <BulkSelectBar
+              selectedCount={selected.size}
+              totalSelectable={selectableIds.length}
+              onSelectAll={handleSelectAll}
+              onClear={() => setSelected(new Set())}
+              onRemove={() => onBulkRemove([...selected])}
+              removeLoading={bulkRemoveLoading}
+            />
+          )}
+          <div className="divide-y divide-black/5 rounded-2xl border border-black/5">
           {players.map((player, index) => (
             <div
               key={player.id}
               className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
             >
-              <div className="min-w-0">
+              <div className="flex min-w-0 items-start gap-3">
+                {onBulkRemove && (
+                  <input
+                    type="checkbox"
+                    className="mt-1 h-4 w-4 accent-sisclub-green"
+                    checked={selected.has(player.id)}
+                    onChange={() => toggleSelected(player.id)}
+                  />
+                )}
+                <div className="min-w-0">
                 <p className="font-semibold text-sisclub-green-dark">
                   #{index + 1} {player.name}
                 </p>
@@ -568,6 +771,7 @@ function WaitlistPanel({
                     minute: "2-digit",
                   })}
                 </p>
+                </div>
               </div>
               <div className="flex flex-wrap gap-2">
                 <Button
@@ -589,7 +793,8 @@ function WaitlistPanel({
               </div>
             </div>
           ))}
-        </div>
+          </div>
+        </>
       )}
     </AdminSection>
   );
