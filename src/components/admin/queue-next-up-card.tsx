@@ -13,6 +13,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import type { NextMatchAssignment } from "@/lib/queue/queue-engine";
+import { recordTierLabel } from "@/lib/player-stats";
 import { cn } from "@/lib/utils";
 
 function teamsFromAssignment(assignment: NextMatchAssignment) {
@@ -22,6 +23,8 @@ function teamsFromAssignment(assignment: NextMatchAssignment) {
     name: p.name,
     skill: p.skillLevel,
     gamesPlayed: p.gamesPlayed,
+    wins: p.wins,
+    losses: p.losses,
   });
   return {
     teamA: [toChip(a1), toChip(a2)] as const,
@@ -55,7 +58,9 @@ export function QueueNextUpCard({
               {nextMatch
                 ? nextMatch.isNewbieCourt
                   ? "Newbie court — all four players are first-timers."
-                  : "Mixed skill — these four are next if you assign from the queue."
+                  : nextMatch.recordBracket
+                    ? `${recordTierLabel(nextMatch.recordBracket)} — matched by win/loss record.`
+                    : "Mixed skill — these four are next if you assign from the queue."
                 : needed > 0
                   ? `Need ${needed} more checked-in player${needed === 1 ? "" : "s"} before a match can start.`
                   : "Not enough eligible players in the queue right now."}

@@ -93,6 +93,7 @@ In Supabase **SQL Editor**:
 10. `supabase/migrations/010_player_withdraw_rls.sql` — withdraw before check-in; admin can remove
 11. `supabase/migrations/011_anonymous_open_play.sql` — join open play without accounts
 12. `supabase/migrations/012_player_skill_newbie.sql` — add **Newbie** player skill level
+13. `supabase/migrations/013_player_wins_losses.sql` — per-session win/loss tallies for matching & leaderboard
 
 ### 2. Environment variables
 

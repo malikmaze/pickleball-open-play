@@ -6,6 +6,12 @@ import {
   pickFourFromQueueUnits,
 } from "@/lib/player-partners";
 import { getCompetitiveGenderTier } from "@/lib/player-gender";
+import {
+  assignmentRecordBracket,
+  partitionUnitsByRecordTier,
+  RECORD_TIER_MATCH_PRIORITY,
+  type RecordTier,
+} from "@/lib/player-stats";
 import { waitingSinceTimestamp } from "@/lib/queue/wait-time";
 import type { PlayerSkillLevel, PlayerStatus, ProfileGender, SkillMatchingMode } from "@/types";
 
@@ -16,6 +22,8 @@ export interface QueuePlayer {
   gender?: ProfileGender;
   status: PlayerStatus;
   gamesPlayed: number;
+  wins: number;
+  losses: number;
   checkedInAt: string | null;
   lastPlayedAt: string | null;
   joinedAt: string;
@@ -39,6 +47,8 @@ export interface NextMatchAssignment {
   teams: BalancedTeams;
   /** True when all four players are Newbie (protected lane). */
   isNewbieCourt?: boolean;
+  /** Homogeneous win/loss bracket when all four share the same record tier. */
+  recordBracket?: RecordTier | null;
 }
 
 function skillValue(level: PlayerSkillLevel): number {
@@ -166,6 +176,29 @@ export function pickFourWithSkillSpread(
   return bestPlayers;
 }
 
+/** Prefer winners-vs-winners (and similar brackets) before falling back to mixed pool. */
+export function pickFourWithRecordMatching(
+  units: QueuePlayer[][],
+  maxSpread: number
+): QueuePlayer[] | null {
+  const { byTier, mixed } = partitionUnitsByRecordTier(units);
+
+  for (const tier of RECORD_TIER_MATCH_PRIORITY) {
+    const tierUnits = byTier[tier];
+    if (countPlayersInUnits(tierUnits) >= 4) {
+      const picked = pickFourWithSkillSpread(tierUnits, maxSpread);
+      if (picked) return picked;
+    }
+  }
+
+  if (countPlayersInUnits(mixed) >= 4) {
+    const picked = pickFourWithSkillSpread(mixed, maxSpread);
+    if (picked) return picked;
+  }
+
+  return pickFourWithSkillSpread(units, maxSpread);
+}
+
 export function selectNextFourPlayers(
   players: QueuePlayer[],
   settings: QueueSessionSettings
@@ -181,7 +214,7 @@ export function selectNextFourPlayers(
     return pickFourFromQueueUnits(newbieUnits);
   }
 
-  return pickFourWithSkillSpread(units, maxSkillSpreadForMode(mode));
+  return pickFourWithRecordMatching(units, maxSkillSpreadForMode(mode));
 }
 
 export function isNewbieOnlyGroup(players: QueuePlayer[]): boolean {
@@ -329,6 +362,7 @@ export function createNextMatchForCourt(
     players: selected,
     teams: balanceTeams(selected),
     isNewbieCourt: isNewbieOnlyGroup(selected),
+    recordBracket: assignmentRecordBracket(selected),
   };
 }
 
@@ -359,6 +393,15 @@ export function validateMatchScore(
     return { valid: false, error: `Winner must reach at least ${targetScore}` };
   }
 
+  if (teamAScore === teamBScore) {
+    return { valid: false, error: "Scores cannot be tied" };
+  }
+
+  // Shutout — winner at/above target, loser on 0
+  if (min === 0 && max >= targetScore) {
+    return { valid: true, winner: teamAScore > teamBScore ? "A" : "B" };
+  }
+
   if (max === targetScore && diff >= winBy) {
     return { valid: true, winner: teamAScore > teamBScore ? "A" : "B" };
   }
@@ -387,6 +430,8 @@ export function toQueuePlayer(player: {
   gender?: ProfileGender;
   status: PlayerStatus;
   gamesPlayed: number;
+  wins?: number;
+  losses?: number;
   checkedInAt?: string;
   lastPlayedAt?: string;
   joinedAt: string;
@@ -400,6 +445,8 @@ export function toQueuePlayer(player: {
     gender: player.gender,
     status: player.status,
     gamesPlayed: player.gamesPlayed,
+    wins: player.wins ?? 0,
+    losses: player.losses ?? 0,
     checkedInAt: player.checkedInAt ?? null,
     lastPlayedAt: player.lastPlayedAt ?? null,
     joinedAt: player.joinedAt,

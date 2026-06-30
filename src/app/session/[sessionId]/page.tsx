@@ -30,6 +30,7 @@ import {
 import { getPlayerProfile } from "@/lib/player-profile";
 import { findPlayerCourt, getGuestStatusHint } from "@/lib/guest-status";
 import { canPlayerWithdrawRegistration } from "@/lib/player-permissions";
+import { formatWinLoss } from "@/lib/player-stats";
 import { getQueuePosition, toQueuePlayer } from "@/lib/queue/queue-engine";
 import { getWaitlistPosition } from "@/lib/waitlist";
 import { SessionPaymentBanner } from "@/components/session-payment-banner";
@@ -227,7 +228,8 @@ function SessionStatusContent({ sessionId }: { sessionId: string }) {
               <PlayerStatusBadge status={myPlayer.status} />
             </div>
             <p className="text-sm text-muted-foreground">
-              Skill: {myPlayer.skillLevel} · Games played: {myPlayer.gamesPlayed}
+              Skill: {myPlayer.skillLevel} · {formatWinLoss(myPlayer)} ·{" "}
+              {myPlayer.gamesPlayed} game{myPlayer.gamesPlayed === 1 ? "" : "s"}
             </p>
             {statusHint && (
               <p className="rounded-2xl bg-white/80 px-3 py-2.5 text-sm font-medium text-sisclub-green-dark">

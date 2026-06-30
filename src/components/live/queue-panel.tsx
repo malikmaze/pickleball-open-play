@@ -4,6 +4,7 @@ import { useState, type ReactNode } from "react";
 import type { QueuePlayer } from "@/lib/queue/queue-engine";
 import { countNewbiesInQueue, isNewbiePlayer } from "@/lib/queue/queue-engine";
 import { groupAdjacentQueuePartners } from "@/lib/player-partners";
+import { formatWinLoss } from "@/lib/player-stats";
 import { formatWaitingTime } from "@/lib/queue/wait-time";
 import { cn } from "@/lib/utils";
 import { BulkSelectBar } from "@/components/admin/bulk-select-bar";
@@ -82,7 +83,7 @@ function QueueRow({
             )}
           </span>
           <span className="text-[11px] text-muted-foreground">
-            {player.gamesPlayed}g · {formatWaitingTime(player)}
+            {player.gamesPlayed}g · {formatWinLoss(player)} · {formatWaitingTime(player)}
           </span>
         </span>
       </span>

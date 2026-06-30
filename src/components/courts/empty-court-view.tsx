@@ -18,6 +18,8 @@ function nextMatchTeams(assignment: NextMatchAssignment) {
     name: p.name,
     skill: p.skillLevel,
     gamesPlayed: p.gamesPlayed,
+    wins: p.wins,
+    losses: p.losses,
   });
   return {
     teamA: [toInfo(a1), toInfo(a2)] as [CourtPlayerInfo, CourtPlayerInfo],

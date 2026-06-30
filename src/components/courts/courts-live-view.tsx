@@ -8,6 +8,7 @@ import { CourtAnnouncementToggle } from "@/components/courts/court-announcement-
 import { ActivityFeed } from "@/components/live/activity-feed";
 import { QueuePanel } from "@/components/live/queue-panel";
 import { WinnerHistory } from "@/components/live/winner-history";
+import { SessionLeaderboard } from "@/components/live/session-leaderboard";
 import { LiveSessionHeader } from "@/components/live/live-session-header";
 import { CourtLiveCard } from "@/components/courts/court-live-card";
 import { CourtSessionStats } from "@/components/courts/court-session-stats";
@@ -42,6 +43,7 @@ import {
   updateMatchScoresRecord,
 } from "@/utils/supabase/queries";
 import type { Court, Match, SessionBundle } from "@/types";
+import { parseCourtScoreField } from "@/lib/numbers";
 import { cn } from "@/lib/utils";
 
 function queueSettings(session: SessionBundle["session"]) {
@@ -86,6 +88,27 @@ export function CourtsLiveView({
   );
   const skipNextCourtPollAnnounce = useRef(false);
   const [now, setNow] = useState(() => new Date());
+
+  const resetCourtScores = useCallback((courtId: string) => {
+    setScores((prev) => ({
+      ...prev,
+      [courtId]: { a: "0", b: "0" },
+    }));
+  }, []);
+
+  const readCourtScores = (
+    courtId: string,
+    match: Match
+  ): { teamAScore: number; teamBScore: number } => {
+    const raw = scores[courtId] ?? {
+      a: match.teamAScore != null ? String(match.teamAScore) : "0",
+      b: match.teamBScore != null ? String(match.teamBScore) : "0",
+    };
+    return {
+      teamAScore: parseCourtScoreField(raw.a),
+      teamBScore: parseCourtScoreField(raw.b),
+    };
+  };
 
   useCourtAnnouncements(
     bundle?.activityLogs,
@@ -184,6 +207,7 @@ export function CourtsLiveView({
         teamBPlayer2Id: b2.id,
       });
       setCourtMatches((prev) => ({ ...prev, [court.id]: match }));
+      resetCourtScores(court.id);
       toast.success(`Next match assigned to Court ${court.courtNumber}`);
 
       if (isCourtAnnouncementsEnabled()) {
@@ -214,6 +238,7 @@ export function CourtsLiveView({
     try {
       const supabase = createClient();
       await startMatchRecord(supabase, match.id, court.id);
+      resetCourtScores(court.id);
       toast.success("Match started");
       await load();
     } catch (err) {
@@ -224,12 +249,7 @@ export function CourtsLiveView({
   };
 
   const handleUpdateScore = async (court: Court, match: Match) => {
-    const raw = scores[court.id] ?? {
-      a: String(match.teamAScore ?? 0),
-      b: String(match.teamBScore ?? 0),
-    };
-    const teamAScore = Number(raw.a);
-    const teamBScore = Number(raw.b);
+    const { teamAScore, teamBScore } = readCourtScores(court.id, match);
     if (Number.isNaN(teamAScore) || Number.isNaN(teamBScore)) {
       toast.error("Enter valid scores");
       return;
@@ -249,12 +269,7 @@ export function CourtsLiveView({
 
   const handleEndMatch = async (court: Court, match: Match) => {
     if (!session) return;
-    const raw = scores[court.id] ?? {
-      a: String(match.teamAScore ?? 0),
-      b: String(match.teamBScore ?? 0),
-    };
-    const teamAScore = Number(raw.a);
-    const teamBScore = Number(raw.b);
+    const { teamAScore, teamBScore } = readCourtScores(court.id, match);
     const result = validateMatchScore(
       teamAScore,
       teamBScore,
@@ -288,15 +303,19 @@ export function CourtsLiveView({
 
       setTimeout(async () => {
         const supabase = createClient();
-        const autoMatch =
-          isCourtRentalActive(court, session, now)
-            ? await resetCourtAfterMatch(supabase, court.id, session)
-            : null;
+        const autoMatch = await resetCourtAfterMatch(
+          supabase,
+          court.id,
+          session
+        );
         setWinnerFlash((prev) => ({ ...prev, [court.id]: null }));
         if (autoMatch) {
           toast.success(
             `Next match auto-assigned on Court ${court.courtNumber}`
           );
+          resetCourtScores(court.id);
+        } else {
+          resetCourtScores(court.id);
         }
         await load();
       }, 3000);
@@ -359,6 +378,7 @@ export function CourtsLiveView({
       } else {
         toast.success(`Court ${court.courtNumber} cleared`);
       }
+      resetCourtScores(court.id);
       await load();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Clear failed");
@@ -497,8 +517,18 @@ export function CourtsLiveView({
               const finishedMatch =
                 court.status === "Finished" ? finishedByCourt[court.id] : null;
               const score = scores[court.id] ?? {
-                a: match?.teamAScore?.toString() ?? "",
-                b: match?.teamBScore?.toString() ?? "",
+                a:
+                  match?.teamAScore != null
+                    ? String(match.teamAScore)
+                    : match?.status === "playing"
+                      ? "0"
+                      : "",
+                b:
+                  match?.teamBScore != null
+                    ? String(match.teamBScore)
+                    : match?.status === "playing"
+                      ? "0"
+                      : "",
               };
 
               return (
@@ -546,6 +576,7 @@ export function CourtsLiveView({
                     courts={bundle.courts}
                     matches={bundle.matches}
                   />
+                  <SessionLeaderboard players={session.players} />
                   {activityLogs.length > 0 && (
                     <ActivityFeed logs={activityLogs} />
                   )}
@@ -568,6 +599,7 @@ export function CourtsLiveView({
                   courts={bundle.courts}
                   matches={bundle.matches}
                 />
+                <SessionLeaderboard players={session.players} />
                 {activityLogs.length > 0 && (
                   <ActivityFeed logs={activityLogs} />
                 )}
