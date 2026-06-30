@@ -82,3 +82,8 @@ export function mergeImportNote(
   if (trimmed.toLowerCase().includes(source.toLowerCase())) return trimmed;
   return `${source} · ${trimmed}`;
 }
+
+export function isWalkInPlayer(player: { note?: string | null }): boolean {
+  const note = player.note?.toLowerCase() ?? "";
+  return note.includes(WALK_IN_SOURCE_NOTE.toLowerCase());
+}

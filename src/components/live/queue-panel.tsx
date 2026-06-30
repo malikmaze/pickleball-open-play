@@ -1,13 +1,13 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import type { QueuePlayer } from "@/lib/queue/queue-engine";
 import { countNewbiesInQueue, isNewbiePlayer } from "@/lib/queue/queue-engine";
 import { groupAdjacentQueuePartners } from "@/lib/player-partners";
 import { formatWaitingTime } from "@/lib/queue/wait-time";
 import { cn } from "@/lib/utils";
+import { BulkSelectBar } from "@/components/admin/bulk-select-bar";
 import { adminQueuePanelHeight } from "@/components/admin/admin-partner-panel";
-import type { Player } from "@/types";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -25,12 +25,18 @@ function QueueRow({
   highlightPlayerId,
   onRemove,
   isNextUp,
+  selectable,
+  selected,
+  onToggleSelect,
 }: {
   player: QueuePlayer;
   position: number;
   highlightPlayerId?: string;
   onRemove?: (playerId: string) => void;
   isNextUp?: boolean;
+  selectable?: boolean;
+  selected?: boolean;
+  onToggleSelect?: (playerId: string) => void;
 }) {
   const highlighted = player.id === highlightPlayerId;
 
@@ -46,6 +52,14 @@ function QueueRow({
       )}
     >
       <span className="flex min-w-0 items-center gap-2">
+        {selectable && (
+          <input
+            type="checkbox"
+            className="h-4 w-4 shrink-0 accent-sisclub-green"
+            checked={selected}
+            onChange={() => onToggleSelect?.(player.id)}
+          />
+        )}
         <span
           className={cn(
             "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold",
@@ -107,8 +121,9 @@ function QueueRow({
 export function QueuePanel({
   players,
   highlightPlayerId,
-  partnerPool: _partnerPool,
   onRemovePlayer,
+  onBulkRemovePlayers,
+  bulkRemoveLoading,
   nextUpPlayerIds,
   headerAction,
   emptyAction,
@@ -117,9 +132,9 @@ export function QueuePanel({
 }: {
   players: QueuePlayer[];
   highlightPlayerId?: string;
-  /** Session players used to resolve partner links (from Queue tab links). */
-  partnerPool?: Pick<Player, "id" | "name" | "partnerId">[];
   onRemovePlayer?: (playerId: string) => void;
+  onBulkRemovePlayers?: (playerIds: string[]) => void;
+  bulkRemoveLoading?: boolean;
   nextUpPlayerIds?: ReadonlySet<string>;
   headerAction?: ReactNode;
   emptyAction?: ReactNode;
@@ -127,9 +142,25 @@ export function QueuePanel({
   /** Fixed-height card with a scrollable list (Queue admin tab). */
   fillHeight?: boolean;
 }) {
+  const [selected, setSelected] = useState<Set<string>>(new Set());
   const groups = groupAdjacentQueuePartners(players);
   const hasPartnerPairs = groups.some((group) => group.kind === "pair");
   const newbieCount = countNewbiesInQueue(players);
+  const bulkSelect = !!onBulkRemovePlayers;
+  const selectableIds = players.map((p) => p.id);
+
+  const toggleSelected = (id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleSelectAll = (checked: boolean) => {
+    setSelected(checked ? new Set(selectableIds) : new Set());
+  };
 
   return (
     <Card
@@ -168,6 +199,17 @@ export function QueuePanel({
       >
         {hasPartnerPairs && <PartnerQueueLegend />}
 
+        {bulkSelect && players.length > 0 && (
+          <BulkSelectBar
+            selectedCount={selected.size}
+            totalSelectable={selectableIds.length}
+            onSelectAll={handleSelectAll}
+            onClear={() => setSelected(new Set())}
+            onRemove={() => onBulkRemovePlayers?.([...selected])}
+            removeLoading={bulkRemoveLoading}
+          />
+        )}
+
         {players.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-black/10 bg-muted/20 px-4 py-8 text-center">
             <p className="text-sm text-muted-foreground">No players waiting.</p>
@@ -194,6 +236,9 @@ export function QueuePanel({
                       highlightPlayerId={highlightPlayerId}
                       onRemove={onRemovePlayer}
                       isNextUp={nextUpPlayerIds?.has(first.id)}
+                      selectable={bulkSelect}
+                      selected={selected.has(first.id)}
+                      onToggleSelect={toggleSelected}
                     />
                     <QueueRow
                       player={second}
@@ -201,6 +246,9 @@ export function QueuePanel({
                       highlightPlayerId={highlightPlayerId}
                       onRemove={onRemovePlayer}
                       isNextUp={nextUpPlayerIds?.has(second.id)}
+                      selectable={bulkSelect}
+                      selected={selected.has(second.id)}
+                      onToggleSelect={toggleSelected}
                     />
                     </PartnerQueueGroup>
                   </li>
@@ -215,6 +263,9 @@ export function QueuePanel({
                     highlightPlayerId={highlightPlayerId}
                     onRemove={onRemovePlayer}
                     isNextUp={nextUpPlayerIds?.has(group.player.id)}
+                    selectable={bulkSelect}
+                    selected={selected.has(group.player.id)}
+                    onToggleSelect={toggleSelected}
                   />
                 </li>
               );

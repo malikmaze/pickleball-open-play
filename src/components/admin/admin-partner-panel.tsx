@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { ChevronDown, Heart, Search } from "lucide-react";
 import { AdminSection } from "@/components/admin/admin-ui";
 import { Input } from "@/components/ui/input";
@@ -156,14 +156,12 @@ export function AdminPartnerPanel({
   const [search, setSearch] = useState("");
   const [unpairedOnly, setUnpairedOnly] = useState(true);
 
-  const filteredPlayers = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return manageable.filter((player) => {
-      if (unpairedOnly && getMutualPartner(player, manageable)) return false;
-      if (!q) return true;
-      return player.name.toLowerCase().includes(q);
-    });
-  }, [manageable, search, unpairedOnly]);
+  const q = search.trim().toLowerCase();
+  const filteredPlayers = manageable.filter((player) => {
+    if (unpairedOnly && getMutualPartner(player, manageable)) return false;
+    if (!q) return true;
+    return player.name.toLowerCase().includes(q);
+  });
 
   const pairChips =
     pairs.length > 0 ? (

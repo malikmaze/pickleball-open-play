@@ -386,7 +386,6 @@ export function CourtsLiveView({
   const queuePanel = (
     <QueuePanel
       players={queuePlayers}
-      partnerPool={session.players}
       highlightPlayerId={highlightPlayerId}
       nextUpPlayerIds={nextUpPlayerIds}
     />

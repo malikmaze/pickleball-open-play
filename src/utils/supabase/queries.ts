@@ -820,6 +820,33 @@ export async function markPlayerPresent(
   }
 }
 
+/** Undo check-in — move from queue (Present/Waiting) back to booked (Registered/Secured). */
+export async function uncheckPlayerFromQueueRecord(
+  supabase: Client,
+  playerId: string
+): Promise<PlayerStatus> {
+  const { data: player, error } = await supabase
+    .from("players")
+    .select("status, secured_at")
+    .eq("id", playerId)
+    .single();
+  if (error) throw error;
+  if (!player) throw new Error("Player not found");
+
+  if (player.status !== "Present" && player.status !== "Waiting") {
+    throw new Error("Player is not in the queue");
+  }
+
+  const nextStatus: PlayerStatus = player.secured_at ? "Secured" : "Registered";
+
+  await updatePlayerRecord(supabase, playerId, {
+    status: nextStatus,
+    checkedInAt: null,
+  });
+
+  return nextStatus;
+}
+
 export async function markPlayerSecured(
   supabase: Client,
   playerId: string,

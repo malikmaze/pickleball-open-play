@@ -22,6 +22,8 @@ export function AdminQueueTab({
   onPartnerChange,
   partnerSaving,
   onRemovePlayer,
+  onBulkRemovePlayers,
+  bulkRemoveLoading,
 }: {
   session: Session;
   eligible: QueuePlayer[];
@@ -30,6 +32,8 @@ export function AdminQueueTab({
   onPartnerChange: (playerId: string, partnerId: string | null) => void;
   partnerSaving: boolean;
   onRemovePlayer: (playerId: string) => void;
+  onBulkRemovePlayers?: (playerIds: string[]) => void;
+  bulkRemoveLoading?: boolean;
 }) {
   const queueSettings = getQueueSessionSettings(session);
   const nextMatch = previewNextMatch(eligible, queueSettings);
@@ -52,8 +56,9 @@ export function AdminQueueTab({
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(300px,22rem)] xl:items-stretch">
         <QueuePanel
           players={eligible}
-          partnerPool={session.players}
           onRemovePlayer={onRemovePlayer}
+          onBulkRemovePlayers={onBulkRemovePlayers}
+          bulkRemoveLoading={bulkRemoveLoading}
           nextUpPlayerIds={nextUpIds}
           fillHeight
           emptyAction={
