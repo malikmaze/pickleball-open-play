@@ -17,7 +17,7 @@ import {
   formatEffectiveCourtRentalWindow,
   getCourtRentalStatus,
 } from "@/lib/court-schedule";
-import { sanitizeScoreTyping } from "@/lib/numbers";
+import { sanitizeScoreTyping, parseCourtScoreField } from "@/lib/numbers";
 import { cn } from "@/lib/utils";
 import { resolvePlayerCourtGender } from "@/lib/player-gender";
 import type { Court, Match, Player, Session } from "@/types";
@@ -40,6 +40,8 @@ function playerInfo(
     name,
     skill: p?.skillLevel,
     gamesPlayed: p?.gamesPlayed,
+    wins: p?.wins,
+    losses: p?.losses,
     gender: resolvePlayerCourtGender(p?.gender, name),
     isYou: highlightPlayerId === id,
   };
@@ -107,12 +109,21 @@ export function CourtLiveCard({
       ]
     : [{ name: "—" }, { name: "—" }];
 
-  const scoreA =
-    match?.teamAScore ??
-    (match ? Number(scoreInput.a) || 0 : finishedMatch?.teamAScore ?? 0);
-  const scoreB =
-    match?.teamBScore ??
-    (match ? Number(scoreInput.b) || 0 : finishedMatch?.teamBScore ?? 0);
+  const persistedA = match?.teamAScore;
+  const persistedB = match?.teamBScore;
+  const hasPersistedScores =
+    persistedA != null && persistedB != null;
+
+  const scoreA = hasPersistedScores
+    ? persistedA
+    : match?.status === "playing"
+      ? parseCourtScoreField(scoreInput.a)
+      : finishedMatch?.teamAScore ?? 0;
+  const scoreB = hasPersistedScores
+    ? persistedB
+    : match?.status === "playing"
+      ? parseCourtScoreField(scoreInput.b)
+      : finishedMatch?.teamBScore ?? 0;
 
   const showSideChangeHint =
     session.allowSideChange &&

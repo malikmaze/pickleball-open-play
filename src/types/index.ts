@@ -79,6 +79,8 @@ export interface Player {
   note?: string;
   status: PlayerStatus;
   gamesPlayed: number;
+  wins: number;
+  losses: number;
   lastPlayedAt?: string;
   checkedInAt?: string;
   securedAt?: string;

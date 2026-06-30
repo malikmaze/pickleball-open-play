@@ -86,13 +86,25 @@ export function parseSessionMaxPlayersInput(raw: string): number | null {
   return parsePositiveInteger(raw, 3);
 }
 
-/** Match scores and other non-negative integers. */
+/** Match scores and other non-negative integers (0–99). */
 export function sanitizeScoreTyping(raw: string): string {
-  return sanitizeIntegerTyping(raw, 2);
+  const digits = raw.replace(/\D/g, "");
+  if (digits === "") return "";
+  if (digits === "0") return "0";
+  return digits.replace(/^0+/, "").slice(0, 2);
 }
 
 export function parseScoreInput(raw: string): number | null {
-  return parsePositiveInteger(raw, 2);
+  const sanitized = sanitizeScoreTyping(raw);
+  if (sanitized === "") return null;
+  const parsed = parseInt(sanitized, 10);
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
+/** Parse a live court score field; blank means 0 (shutout loser). */
+export function parseCourtScoreField(raw: string): number {
+  const parsed = parseScoreInput(raw);
+  return parsed === null ? 0 : parsed;
 }
 
 /** Payment amounts — strip leading zeros on the whole part, keep decimals. */

@@ -19,6 +19,7 @@ import { ImportPlayersDialog } from "@/components/admin/import-players-dialog";
 import { WalkInQuickAdd } from "@/components/admin/walk-in-quick-add";
 import { BulkSelectBar } from "@/components/admin/bulk-select-bar";
 import { PlayerRoster } from "@/components/admin/player-roster";
+import { SessionLeaderboard } from "@/components/live/session-leaderboard";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import {
   SessionForm,
@@ -535,6 +536,11 @@ function SessionAdminContent({ sessionId }: { sessionId: string }) {
               </Card>
             )}
           </div>
+
+          <SessionLeaderboard
+            players={session.players}
+            className="mt-4"
+          />
         </>
       )}
 

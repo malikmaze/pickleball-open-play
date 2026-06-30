@@ -11,6 +11,8 @@ function player(overrides: Partial<Player> = {}): Player {
     skillLevel: "Beginner",
     status: "Present",
     gamesPlayed: 0,
+    wins: 0,
+    losses: 0,
     isActive: true,
     joinedAt: "2026-01-01T10:00:00.000Z",
     ...overrides,

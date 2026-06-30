@@ -4,6 +4,7 @@ import {
   createNextMatchForCourt,
   isNewbieOnlyGroup,
   partitionNewbieUnits,
+  pickFourWithRecordMatching,
   pickFourWithSkillSpread,
   selectNextFourPlayers,
   type QueuePlayer,
@@ -24,6 +25,8 @@ function makePlayer(
     skillLevel,
     status: "Waiting",
     gamesPlayed: 0,
+    wins: 0,
+    losses: 0,
     checkedInAt: BASE,
     lastPlayedAt: null,
     joinedAt: BASE,
@@ -104,7 +107,46 @@ describe("selectNextFourPlayers", () => {
   });
 });
 
+describe("pickFourWithRecordMatching", () => {
+  it("groups winners together when enough are waiting", () => {
+    const units = buildQueueUnits([
+      makePlayer("w1", "Beginner", { wins: 2, losses: 0, gamesPlayed: 2 }),
+      makePlayer("w2", "Beginner", { wins: 1, losses: 0, gamesPlayed: 1 }),
+      makePlayer("w3", "Novice", { wins: 3, losses: 1, gamesPlayed: 4 }),
+      makePlayer("w4", "Novice", { wins: 2, losses: 1, gamesPlayed: 3 }),
+      makePlayer("l1", "Beginner", { wins: 0, losses: 2, gamesPlayed: 2 }),
+      makePlayer("l2", "Beginner", { wins: 1, losses: 3, gamesPlayed: 4 }),
+      makePlayer("l3", "Novice", { wins: 0, losses: 1, gamesPlayed: 1 }),
+      makePlayer("l4", "Novice", { wins: 0, losses: 3, gamesPlayed: 3 }),
+    ]);
+
+    const picked = pickFourWithRecordMatching(units, 2);
+    expect(picked?.map((p) => p.id).sort()).toEqual(["w1", "w2", "w3", "w4"]);
+  });
+
+  it("groups losers when no full winner bracket exists", () => {
+    const units = buildQueueUnits([
+      makePlayer("w1", "Beginner", { wins: 2, losses: 0, gamesPlayed: 2 }),
+      makePlayer("l1", "Beginner", { wins: 0, losses: 2, gamesPlayed: 2 }),
+      makePlayer("l2", "Beginner", { wins: 0, losses: 1, gamesPlayed: 1 }),
+      makePlayer("l3", "Novice", { wins: 1, losses: 3, gamesPlayed: 4 }),
+      makePlayer("l4", "Novice", { wins: 0, losses: 2, gamesPlayed: 2 }),
+    ]);
+
+    const picked = pickFourWithRecordMatching(units, 2);
+    expect(picked?.map((p) => p.id).sort()).toEqual(["l1", "l2", "l3", "l4"]);
+  });
+});
+
 describe("createNextMatchForCourt", () => {
+  it("flags record bracket on assignment", () => {
+    const players = ["w1", "w2", "w3", "w4"].map((id) =>
+      makePlayer(id, "Beginner", { wins: 2, losses: 0, gamesPlayed: 2 })
+    );
+    const match = createNextMatchForCourt(players, defaultSettings);
+    expect(match?.recordBracket).toBe("winning");
+  });
+
   it("flags newbie court on assignment", () => {
     const players = ["n1", "n2", "n3", "n4"].map((id) =>
       makePlayer(id, "Newbie")

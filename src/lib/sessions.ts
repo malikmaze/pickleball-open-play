@@ -55,6 +55,8 @@ export function mapPlayer(row: PlayerRow): Player {
     note: row.note ?? undefined,
     status: row.status as PlayerStatus,
     gamesPlayed: row.games_played ?? 0,
+    wins: row.wins ?? 0,
+    losses: row.losses ?? 0,
     lastPlayedAt: row.last_played_at ?? undefined,
     checkedInAt: row.checked_in_at ?? undefined,
     securedAt: row.secured_at ?? undefined,

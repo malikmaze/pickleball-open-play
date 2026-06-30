@@ -100,6 +100,8 @@ export type Database = {
           status: string;
           note: string | null;
           games_played: number;
+          wins: number;
+          losses: number;
           last_played_at: string | null;
           checked_in_at: string | null;
           secured_at: string | null;
@@ -118,6 +120,8 @@ export type Database = {
           status?: string;
           note?: string | null;
           games_played?: number;
+          wins?: number;
+          losses?: number;
           last_played_at?: string | null;
           checked_in_at?: string | null;
           secured_at?: string | null;
@@ -136,6 +140,8 @@ export type Database = {
           status?: string;
           note?: string | null;
           games_played?: number;
+          wins?: number;
+          losses?: number;
           last_played_at?: string | null;
           checked_in_at?: string | null;
           secured_at?: string | null;

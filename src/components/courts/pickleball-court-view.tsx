@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import { motion } from "framer-motion";
 import { Heart, Loader2, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { formatWinLoss } from "@/lib/player-stats";
 import { isTestPlayerName } from "@/lib/test-players";
 import type { CourtPlayerInfo } from "./types";
 
@@ -87,7 +88,11 @@ export function CourtPlayerChip({
         </p>
         <p className={cn("text-muted-foreground", compact ? "text-[10px]" : "text-[11px]")}>
           {player.skill ? `${player.skill}` : "—"}
-          {player.gamesPlayed !== undefined && ` · ${player.gamesPlayed} games`}
+          {player.wins !== undefined && player.losses !== undefined
+            ? ` · ${formatWinLoss({ wins: player.wins, losses: player.losses })}`
+            : player.gamesPlayed !== undefined
+              ? ` · ${player.gamesPlayed} games`
+              : ""}
         </p>
       </div>
     </div>

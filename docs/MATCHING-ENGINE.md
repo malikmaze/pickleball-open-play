@@ -93,6 +93,23 @@ Skill level **`Newbie`** is for true first-timers (no racket sport experience).
 
 Spillover means a Newbie may be matched with more experienced players when there aren't enough Newbies to fill a court. Organizers can delay assignment or adjust skill on the roster.
 
+## Win/loss record brackets
+
+After each finished match, players get `wins` / `losses` tallies on their session row ([`finishMatchRecord`](../src/utils/supabase/queries.ts)).
+
+[`pickFourWithRecordMatching`](../src/lib/queue/queue-engine.ts) groups players by **record tier** before skill spread:
+
+| Tier | Rule |
+|------|------|
+| **winning** | More wins than losses |
+| **losing** | More losses than wins |
+| **even** | Wins equal losses |
+| **unplayed** | No finished matches yet |
+
+Priority when filling a court (main pool): **winning → losing → even → unplayed**, then mixed units. Within a tier, the same skill-spread rules apply. Goal: winners face winners, rebuild bracket for players coming off losses.
+
+Partner units with mixed records go to the **mixed** pool.
+
 ## Main pool skill matching
 
 When not filling a newbie-only court, [`pickFourWithSkillSpread`](../src/lib/queue/queue-engine.ts) searches all queue units for a valid group of 4.

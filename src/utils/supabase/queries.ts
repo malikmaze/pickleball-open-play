@@ -18,6 +18,7 @@ import {
   type CourtScheduleEntry,
   isCourtRentalActive,
 } from "@/lib/court-schedule";
+import { enrichPlayersWithMatchStats } from "@/lib/player-stats";
 import {
   normalizePhilippineMobile,
   parsePhilippineMobile,
@@ -189,7 +190,10 @@ export async function fetchSessionBundle(
   if (logsError) throw logsError;
 
   return {
-    session,
+    session: {
+      ...session,
+      players: enrichPlayersWithMatchStats(session.players, (matches ?? []).map(mapMatch)),
+    },
     courts: (courts ?? []).map(mapCourt),
     matches: (matches ?? []).map(mapMatch),
     activity: (activity ?? []).map(mapActivity),
@@ -701,6 +705,8 @@ export async function updatePlayerRecord(
     note?: string;
     isActive?: boolean;
     gamesPlayed?: number;
+    wins?: number;
+    losses?: number;
     checkedInAt?: string | null;
     securedAt?: string | null;
     lastPlayedAt?: string | null;
@@ -715,6 +721,8 @@ export async function updatePlayerRecord(
   if (updates.isActive !== undefined) payload.is_active = updates.isActive;
   if (updates.gamesPlayed !== undefined)
     payload.games_played = updates.gamesPlayed;
+  if (updates.wins !== undefined) payload.wins = updates.wins;
+  if (updates.losses !== undefined) payload.losses = updates.losses;
   if (updates.checkedInAt !== undefined)
     payload.checked_in_at = updates.checkedInAt;
   if (updates.securedAt !== undefined) payload.secured_at = updates.securedAt;
@@ -1174,17 +1182,45 @@ export async function finishMatchRecord(
     .eq("id", matchId);
   if (error) throw error;
 
+  if (!match) throw new Error("Match not found");
+
+  const teamAIds = [match.team_a_player_1, match.team_a_player_2].filter(
+    Boolean
+  ) as string[];
+  const teamBIds = [match.team_b_player_1, match.team_b_player_2].filter(
+    Boolean
+  ) as string[];
+  const winnerIds = new Set(
+    winnerTeam === "A" ? teamAIds : teamBIds
+  );
+
   for (const playerId of playerIds) {
-    const { data: player } = await supabase
+    const { data: player, error: playerError } = await supabase
       .from("players")
       .select("games_played")
       .eq("id", playerId)
       .single();
+    if (playerError) throw playerError;
+
+    const won = winnerIds.has(playerId);
     await updatePlayerRecord(supabase, playerId, {
       status: "Waiting",
       gamesPlayed: (player?.games_played ?? 0) + 1,
       lastPlayedAt: now,
     });
+
+    // Optional — requires migration 013_player_wins_losses.sql
+    const { data: wlPlayer, error: wlSelectError } = await supabase
+      .from("players")
+      .select("wins, losses")
+      .eq("id", playerId)
+      .maybeSingle();
+    if (!wlSelectError && wlPlayer) {
+      await updatePlayerRecord(supabase, playerId, {
+        wins: (wlPlayer.wins ?? 0) + (won ? 1 : 0),
+        losses: (wlPlayer.losses ?? 0) + (won ? 0 : 1),
+      });
+    }
   }
 
   await updateCourtStatus(supabase, courtId, "Finished");

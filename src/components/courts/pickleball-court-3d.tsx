@@ -4,6 +4,7 @@ import { useRef } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { Html, OrbitControls, RoundedBox, Text } from "@react-three/drei";
 import type { Group, Mesh } from "three";
+import { PCFShadowMap } from "three";
 import type { CourtPlayerInfo } from "./types";
 
 const COURT_W = 4.4;
@@ -378,6 +379,9 @@ export function PickleballCourt3D({
     <div className={className} style={{ width: "100%", height: "100%" }}>
       <Canvas
         shadows
+        onCreated={({ gl }) => {
+          gl.shadowMap.type = PCFShadowMap;
+        }}
         camera={{ position: [0, 9, 10], fov: 38, near: 0.1, far: 100 }}
         gl={{ antialias: true, alpha: true }}
         style={{
